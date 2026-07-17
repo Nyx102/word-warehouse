@@ -36,7 +36,7 @@ Notes:
 Notes:
 - No official EN exists for series 2 (Yen Press licensed series 1 only).
 - raw/ holds the WIP v04 draft (Google-Docs export, MTL from the ZH fan TL).
-- ZH v01–v04 are simplified script; ZH v05–v11 are traditional script (different rip lineage).
+- ZH v01–v04: simplified primaries plus traditional `-traditional` alternates (independent edition); ZH v05–v11 are traditional only.
 
 ## Shopping list (true gaps)
 - Full JP ebook rips of SukaMoka #10 and #11 — current files are preview/sample editions (complete front matter + TOC, ~20% of body, then legal back matter; no afterword).
