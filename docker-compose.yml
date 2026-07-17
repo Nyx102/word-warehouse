@@ -3,10 +3,8 @@ services:
     build: .
     container_name: worldend-workbench
     restart: unless-stopped
-    # bind only on the Netbird mesh IP — never expose publicly: the embedded
-    # agent can edit files and there is deliberately no auth on the overlay
     ports:
-      - "100.111.187.66:8686:8686"
+      - "8686:8686"
     volumes:
       - /home/ubuntu/worldend/corpus:/home/ubuntu/worldend/corpus
       - /home/ubuntu/worldend/app:/home/ubuntu/worldend/app
