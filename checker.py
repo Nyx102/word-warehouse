@@ -264,7 +264,7 @@ def lint_targets(path=None):
 def lint(path=None, include_dismissed=False):
     ensure_fresh()
     conn = connect()
-    dismissed = set() if include_dismissed else _dismissed(conn)
+    dismissed = _dismissed(conn)
     out = []
     for rel in lint_targets(path):
         try:
@@ -275,7 +275,12 @@ def lint(path=None, include_dismissed=False):
         flags = check_nearmiss(text, rel)
         if is_finished:
             flags += check_regression(text, rel)
-        flags = [f for f in flags if (f["category"], f["key"]) not in dismissed]
+        if include_dismissed:
+            for f in flags:
+                if (f["category"], f["key"]) in dismissed:
+                    f["dismissed"] = True
+        else:
+            flags = [f for f in flags if (f["category"], f["key"]) not in dismissed]
         if flags:
             out.append(dict(path=rel, flags=flags))
     return dict(generated_at=time.time(), files=out,
