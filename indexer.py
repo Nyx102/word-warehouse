@@ -26,6 +26,9 @@ TRAD_HINT = set("來沒嗎麼麽爲這裡兩點時說話讀寫萬與體見雲")
 SIMP_HINT = set("么时见说这两点为没读写万与体云")
 
 SUBTITLE_LINE = re.compile(r"^[\s　]*[-－―‐][A-Za-z].*[-－―‐][\s　]*$")
+# JP rips put the whole TOC entry on one line: 『title』－subtitle－ (or ASCII dashes)
+ONE_LINE_ENTRY = re.compile(
+    r"^[\s　]*[『「]([^』」]{1,50})[』」]\s*[-－―‐]\s*([A-Za-z][^-－―‐]{0,60})[-－―‐]")
 VOL_MARKER = re.compile(r"^第[一二三四五六七八九十]+卷\s*(.*)$")
 BRACKET_TITLE = re.compile(r"[『「]([^』」]+)[』」]")
 AFTERWORD = re.compile(r"あとがき|後書き|后记|後記|afterword", re.I)
@@ -33,6 +36,9 @@ ILLUST = re.compile(r"^插图$|^插圖$")
 MD_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 SCENE_MD = re.compile(r"^\s*\*\s*\*\s*\*\s*$")
 RUBY = re.compile(r"(?<=[一-鿿])[ぁ-ゖ]{1,3}(?=[一-鿿])")
+# hiragana runs between kanji that are (or end with) these are grammar, not ruby:
+# stripping them fabricates compounds (人の形 -> 人形) and poisons search
+PARTICLES = ("の", "が", "を", "に", "で", "と", "は", "も", "や", "へ")
 
 
 def sniff_lang(text: str) -> str:
@@ -59,8 +65,18 @@ def subtitle_key(s: str):
     return s or None
 
 
+def _ruby_repl(m):
+    run = m.group(0)
+    if run in PARTICLES or (len(run) == 2 and run in ("から", "まで", "より")):
+        return run  # pure particle — keep
+    for p in PARTICLES:
+        if len(run) > 1 and run.endswith(p):
+            return p  # ruby reading followed by a particle: 鍋なべの中 -> 鍋の中
+    return ""
+
+
 def strip_ruby(text: str) -> str:
-    return RUBY.sub("", text)
+    return RUBY.sub(_ruby_repl, text)
 
 
 def make_norm(text: str, lang: str):
@@ -113,7 +129,10 @@ def _toc_entries(lines, limit=800):
     when a chapter's body heading fell inside the cluster (duplicate title)."""
     raw = []
     for i, l in enumerate(lines[:limit]):
-        if SUBTITLE_LINE.match(l) and len(l.strip()) < 70:
+        one = ONE_LINE_ENTRY.match(l)
+        if one:
+            raw.append((i, one.group(1).strip(), one.group(2).strip()))
+        elif SUBTITLE_LINE.match(l) and len(l.strip()) < 70:
             subtitle = l.strip().strip("-－―‐ 　").strip()
             title = None
             for j in range(i - 1, max(i - 4, -1), -1):
@@ -137,6 +156,11 @@ def _toc_entries(lines, limit=800):
         else:
             seen[k] = len(entries)
             entries.append((idx, title, subtitle))
+    if len(entries) < 2:
+        # a one-entry "TOC" is a stray body heading, not a contents block
+        # (real TOC-less files would otherwise get a phantom chapter and their
+        # opening prose mislabeled as frontmatter)
+        return [], {}
     return entries, dup_positions
 
 

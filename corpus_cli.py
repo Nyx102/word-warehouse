@@ -175,7 +175,10 @@ def cmd_reindex(args):
 
 def cmd_lint(args):
     import checker
-    checker.cli_lint(args.path, verbose=args.verbose)
+    try:
+        checker.cli_lint(args.path, verbose=args.verbose)
+    except FileNotFoundError as e:
+        sys.exit(str(e))
 
 
 def main():

@@ -105,23 +105,33 @@ def start_turn(thread_id, text):
         turn = Turn(thread_id, row["t"])
         _active[thread_id] = turn
 
-    conn = connect()
-    turn.seq += 1
-    _persist(conn, thread_id, turn.turn_no, turn.seq, "user_text",
-             dict(kind="user_text", text=text, turn=turn.turn_no, seq=turn.seq))
-    conn.execute("UPDATE threads SET last_active=? WHERE id=?",
-                 (time.time(), thread_id))
-    conn.commit()
-
-    worker = threading.Thread(target=_run_turn, args=(turn, text), daemon=True)
-    worker.start()
+    try:
+        conn = connect()
+        turn.seq += 1
+        _persist(conn, thread_id, turn.turn_no, turn.seq, "user_text",
+                 dict(kind="user_text", text=text, turn=turn.turn_no, seq=turn.seq))
+        conn.execute("UPDATE threads SET last_active=? WHERE id=?",
+                     (time.time(), thread_id))
+        conn.commit()
+        worker = threading.Thread(target=_run_turn, args=(turn, text), daemon=True)
+        worker.start()
+    except BaseException:
+        # never leave a registered turn with no worker to clean it up
+        with _active_lock:
+            _active.pop(thread_id, None)
+        raise
     return turn.turn_no
 
 
 def _emit(turn, conn, kind, **payload):
     turn.seq += 1
     payload.update(kind=kind, turn=turn.turn_no, seq=turn.seq)
-    _persist(conn, turn.thread_id, turn.turn_no, turn.seq, kind, payload)
+    try:
+        _persist(conn, turn.thread_id, turn.turn_no, turn.seq, kind, payload)
+    except Exception:
+        # persistence failure (db busy, thread deleted mid-turn) must not stop
+        # the stream or the cleanup path; the row is merely absent from replay
+        pass
     turn.publish(payload)
 
 
@@ -172,6 +182,8 @@ def _run_turn(turn, text):
     except Exception as e:
         _emit(turn, conn, "error", message=str(e))
     finally:
+        if turn.proc and turn.proc.poll() is None:
+            turn.proc.kill()
         try:
             _emit(turn, conn, "done")
         except Exception:
@@ -294,6 +306,10 @@ def create_thread(title=None):
 
 
 def delete_thread(thread_id):
+    turn = active_turn(thread_id)
+    if turn:
+        _kill(turn, "thread deleted")
+        turn.done.wait(10)
     conn = connect()
     conn.execute("DELETE FROM messages WHERE thread_id=?", (thread_id,))
     conn.execute("DELETE FROM threads WHERE id=?", (thread_id,))

@@ -253,6 +253,8 @@ def lint_targets(path=None):
         if p.is_dir():
             return [q.relative_to(CORPUS).as_posix()
                     for q in sorted(p.rglob("*")) if q.suffix in (".md", ".txt")]
+        if not p.is_file():
+            raise FileNotFoundError(f"no such lint target: {path}")
         return [path]
     targets = [p.relative_to(CORPUS).as_posix()
                for p in sorted(CORPUS.glob("raw/*")) if p.suffix in (".md", ".txt")]

@@ -70,7 +70,9 @@ WHERE (c.text LIKE ? OR c.text_norm LIKE ?)""" + extra + " LIMIT ?"
 
     if route == "cjk":
         fts, match = "fts_cjk", _quote_fts(q.strip(), phrase=True)
-        snippet = "snippet(fts_cjk, -1, '>>', '<<', '…', 30)"
+        # column 0 (raw text) only: column -1 could render the normalized
+        # shadow column, showing ruby-stripped fabrications as if corpus text
+        snippet = "snippet(fts_cjk, 0, '>>', '<<', '…', 30)"
         order = "rank"
     else:
         fts, match = "fts_en", _quote_fts(q, phrase=False)
