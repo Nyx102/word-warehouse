@@ -1,19 +1,20 @@
 """Shared paths and file classification for the WorldEnd workbench."""
 
+import os
 import re
 from pathlib import Path
 
-CORPUS = Path("/home/ubuntu/worldend/corpus")
+CORPUS = Path(os.environ.get("WORKBENCH_CORPUS", "/home/ubuntu/worldend/corpus"))
 APP = Path(__file__).resolve().parent
-DATA = APP / "data"
+DATA = Path(os.environ.get("WORKBENCH_DATA", str(APP / "data")))
 DB_PATH = DATA / "corpus.db"
 
 REPO = CORPUS / "worldend2/repo"
 RULES_YAML = REPO / "Volumes/replacements.yaml"
 SCRIPTS_DIR = REPO / "Scripts"
 
-HOST = "100.111.187.66"
-PORT = 8686
+HOST = os.environ.get("WORKBENCH_HOST", "100.111.187.66")
+PORT = int(os.environ.get("WORKBENCH_PORT", "8686"))
 
 # glob patterns (relative to CORPUS) that make up the index, and nothing else
 INCLUDE_GLOBS = [
