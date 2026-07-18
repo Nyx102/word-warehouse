@@ -204,9 +204,24 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return f
 
+    def _safe_repo_path(self, repo, rel):
+        """Resolve a repo-relative path under one of gitops' repos (ROOT for
+        'corpus', the nested translation repo for 'repo'). The Diffs view lists
+        files by (repo, repo-relative path); the file API must speak the same
+        space so anything in a repo's git status is loadable/editable."""
+        base = gitops.REPOS.get(repo)
+        if base is None or not rel or ".git" in rel.split("/"):
+            return None
+        base = base.resolve()
+        f = (base / rel).resolve()
+        if not f.is_relative_to(base):
+            return None
+        return f
+
     def h_file(self):
         rel = self._q("path", "")
-        f = self._safe_corpus_path(rel)
+        repo = self._q("repo")
+        f = self._safe_repo_path(repo, rel) if repo else self._safe_corpus_path(rel)
         if f is None or not f.is_file():
             return self._error("not found", 404)
         if self._q("full"):
@@ -229,7 +244,8 @@ class Handler(BaseHTTPRequestHandler):
         import os
         b = self._body()
         rel = b.get("path", "")
-        f = self._safe_corpus_path(rel)
+        repo = b.get("repo")
+        f = self._safe_repo_path(repo, rel) if repo else self._safe_corpus_path(rel)
         if f is None:
             return self._error("bad path", 400)
         content = b.get("content")

@@ -50,8 +50,9 @@ function DiffText({ text }: { text: string }) {
  * Mobile: single editable editor with a unified merge view and per-chunk
  * accept/reject controls.
  *
- * `path` is repo-relative (used for git ops); for /api/file it is mapped to a
- * corpus-relative path ('worldend2/repo/' prefix for the translation repo). */
+ * `path` is repo-relative; both the git endpoints and /api/file take (repo,
+ * path) and resolve it under that repo's root, so any file in the repo's git
+ * status is loadable/editable (including code at the project root). */
 export function MergeEditor({ repo, path, status, onChanged, onClose }: {
   repo: RepoName;
   path: string;
@@ -59,7 +60,6 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
   onChanged: () => void;
   onClose: () => void;
 }) {
-  const corpusPath = repo === 'repo' ? 'worldend2/repo/' + path : path;
   const untracked = status.trim() === '??';
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
@@ -97,7 +97,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
     }
     try {
       const f = await api<FileFull>(
-        `/api/file?path=${encodeURIComponent(corpusPath)}&full=1`,
+        `/api/file?repo=${repo}&path=${encodeURIComponent(path)}&full=1`,
         { silent: true },
       );
       savedRef.current = f.content;
@@ -131,7 +131,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
         setLoadErr(reason);
       }
     }
-  }, [repo, path, corpusPath]);
+  }, [repo, path]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -142,8 +142,9 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
     const content = v.getDoc();
     setSaving(true);
     try {
-      const body: { path: string; content: string; expect_sha256?: string } = {
-        path: corpusPath,
+      const body: { repo: RepoName; path: string; content: string; expect_sha256?: string } = {
+        repo,
+        path,
         content,
       };
       if (shaRef.current) body.expect_sha256 = shaRef.current;
@@ -161,7 +162,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
     } finally {
       setSaving(false);
     }
-  }, [corpusPath, path, onChanged]);
+  }, [repo, path, onChanged]);
   const saveRef = useRef(save);
   saveRef.current = save;
 
@@ -251,7 +252,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
   return (
     <div className="merge-editor">
       <div className="editor-toolbar">
-        <span className="editor-path mono" title={corpusPath}>{path}</span>
+        <span className="editor-path mono" title={path}>{path}</span>
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         <span className="toolbar-spacer" />
         <button
