@@ -24,29 +24,35 @@ from config import CORPUS, DATA, HOST, PORT, RULES_YAML
 from db import connect
 from indexer import ensure_fresh
 
-STATIC = Path(__file__).resolve().parent / "static"
+_APP_DIR = Path(__file__).resolve().parent
+_DIST = _APP_DIR / "frontend" / "dist"
+STATIC = _DIST if _DIST.is_dir() else _APP_DIR / "static"
 POLL_INTERVAL = 5
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
         ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
         ".png": "image/png", ".ico": "image/x-icon"}
 
-_lint_cache = {"report": None, "lock": threading.Lock()}
+_lint_cache = {"reports": {}, "lock": threading.Lock()}
 
 
-def _refresh_lint(force=False):
+def _refresh_lint(force=False, scope="all"):
     with _lint_cache["lock"]:
-        if _lint_cache["report"] is None or force:
-            _lint_cache["report"] = checker.lint()
-    return _lint_cache["report"]
+        if force:
+            _lint_cache["reports"].clear()
+        if scope not in _lint_cache["reports"]:
+            _lint_cache["reports"][scope] = checker.lint(scope=scope)
+        return _lint_cache["reports"][scope]
 
 
 def poller():
+    import triage
     while True:
         try:
             changed = ensure_fresh()
             if changed:
-                _refresh_lint(force=True)
+                report = _refresh_lint(force=True)
+                triage.schedule(report)
         except Exception:
             traceback.print_exc()
         time.sleep(POLL_INTERVAL)
@@ -91,17 +97,26 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         self._route("DELETE")
 
+    def do_PUT(self):
+        self._route("PUT")
+
+    def do_PATCH(self):
+        self._route("PATCH")
+
     def _route(self, method):
         parsed = urlparse(self.path)
         self.query = parse_qs(parsed.query)
         path = unquote(parsed.path)
         try:
+            matched = False
             for pattern, methods, fn in ROUTES:
                 m = pattern.match(path)
                 if m:
-                    if method not in methods:
-                        return self._error("method not allowed", 405)
-                    return fn(self, *m.groups())
+                    matched = True
+                    if method in methods:
+                        return fn(self, *m.groups())
+            if matched:
+                return self._error("method not allowed", 405)
             if method == "GET":
                 return self._static(path)
             self._error("not found", 404)
@@ -118,12 +133,19 @@ class Handler(BaseHTTPRequestHandler):
         rel = "index.html" if path in ("/", "") else path.lstrip("/")
         f = (STATIC / rel).resolve()
         if not str(f).startswith(str(STATIC)) or not f.is_file():
-            return self._error("not found", 404)
+            if path.startswith("/api/"):
+                return self._error("not found", 404)
+            f = STATIC / "index.html"  # SPA fallback
+            if not f.is_file():
+                return self._error("not found", 404)
         body = f.read_bytes()
+        immutable = "/assets/" in f.as_posix()
         self.send_response(200)
         self.send_header("Content-Type", MIME.get(f.suffix, "application/octet-stream"))
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Cache-Control",
+                         "public, max-age=31536000, immutable" if immutable
+                         else "no-cache")
         self.end_headers()
         self.wfile.write(body)
 
@@ -169,16 +191,94 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("missing series")
         self._json(dict(rows=searchmod.align(series, self._q("volume") or None)))
 
+    def _safe_corpus_path(self, rel):
+        if not rel or ".git" in rel.split("/"):
+            return None
+        f = (CORPUS / rel).resolve()
+        if not str(f).startswith(str(CORPUS)):
+            return None
+        return f
+
     def h_file(self):
         rel = self._q("path", "")
-        f = (CORPUS / rel).resolve()
-        if not str(f).startswith(str(CORPUS)) or not f.is_file():
+        f = self._safe_corpus_path(rel)
+        if f is None or not f.is_file():
             return self._error("not found", 404)
+        if self._q("full"):
+            if f.stat().st_size > 2 * 1024 * 1024:
+                return self._error("file too large for editor", 413)
+            content = f.read_text(encoding="utf-8", errors="replace")
+            import hashlib
+            return self._json(dict(
+                path=rel, content=content,
+                sha256=hashlib.sha256(content.encode()).hexdigest(),
+                total_lines=content.count("\n") + 1))
         lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
         start = max(1, int(self._q("start", "1")))
         count = min(1000, int(self._q("count", "200")))
         self._json(dict(path=rel, total_lines=len(lines), start=start,
                         lines=lines[start - 1:start - 1 + count]))
+
+    def h_file_put(self):
+        import hashlib
+        import os
+        b = self._body()
+        rel = b.get("path", "")
+        f = self._safe_corpus_path(rel)
+        if f is None:
+            return self._error("bad path", 400)
+        content = b.get("content")
+        if content is None or len(content) > 5 * 1024 * 1024:
+            return self._error("missing or oversized content", 400)
+        expect = b.get("expect_sha256")
+        if expect and f.is_file():
+            cur = hashlib.sha256(f.read_bytes()).hexdigest()
+            if cur != expect:
+                return self._error("file changed on disk", 409)
+        tmp = f.with_suffix(f.suffix + ".tmp~")
+        tmp.write_text(content, encoding="utf-8")
+        os.replace(tmp, f)
+        self._json(dict(ok=True,
+                        sha256=hashlib.sha256(content.encode()).hexdigest()))
+
+    def h_git_file(self):
+        try:
+            self._json(gitops.show(self._q("repo", "corpus"),
+                                   self._q("path", ""),
+                                   self._q("rev", "HEAD")))
+        except (RuntimeError, KeyError) as e:
+            self._error(str(e), 400)
+
+    def h_git_revert(self):
+        b = self._body()
+        try:
+            gitops.revert(b.get("repo", "corpus"), b.get("path", ""))
+        except RuntimeError as e:
+            return self._error(str(e), 409)
+        except KeyError:
+            return self._error("bad repo", 400)
+        self._json(dict(ok=True))
+
+    def h_thread_patch(self, tid):
+        b = self._body()
+        conn = connect()
+        if "model" in b:
+            m = b["model"]
+            if m not in ("haiku", "sonnet", "opus", "default", None):
+                return self._error("bad model", 400)
+            conn.execute("UPDATE threads SET model=? WHERE id=?", (m, int(tid)))
+        if "title" in b:
+            conn.execute("UPDATE threads SET title=? WHERE id=?",
+                         (b["title"], int(tid)))
+        conn.commit()
+        self._json(dict(ok=True))
+
+    def h_triage_reject(self):
+        import triage
+        b = self._body()
+        triage.user_override(b["category"], b["key"])
+        _refresh_lint(force=True)
+        self._json(dict(ok=True))
 
     def h_coverage(self):
         p = CORPUS / "notes/coverage.md"
@@ -186,10 +286,17 @@ class Handler(BaseHTTPRequestHandler):
                         if p.is_file() else "no coverage report yet"))
 
     def h_lint(self):
+        import triage
+        scope = self._q("scope", "all")
+        if scope not in ("raw", "finished", "all"):
+            return self._error("bad scope", 400)
         if self._q("include_dismissed"):
-            self._json(checker.lint(include_dismissed=True))
+            report = checker.lint(include_dismissed=True, scope=scope)
         else:
-            self._json(_refresh_lint())
+            report = _refresh_lint(scope=scope)
+        report = dict(report)
+        triage.annotate(report)
+        self._json(report)
 
     def h_lint_dismiss(self):
         b = self._body()
@@ -312,6 +419,11 @@ ROUTES = [
     R(r"/api/git/diff", {"GET"}, Handler.h_git_diff),
     R(r"/api/git/log", {"GET"}, Handler.h_git_log),
     R(r"/api/git/commit", {"POST"}, Handler.h_git_commit),
+    R(r"/api/git/file", {"GET"}, Handler.h_git_file),
+    R(r"/api/git/revert", {"POST"}, Handler.h_git_revert),
+    R(r"/api/file", {"PUT"}, Handler.h_file_put),
+    R(r"/api/threads/(\d+)", {"PATCH"}, Handler.h_thread_patch),
+    R(r"/api/triage/reject", {"POST"}, Handler.h_triage_reject),
 ]
 
 # GET+POST share /api/threads: dispatch by method

@@ -139,9 +139,13 @@ def _run_turn(turn, text):
     _global_turns.acquire()
     conn = connect()
     try:
-        row = conn.execute("SELECT claude_session_id FROM threads WHERE id=?",
+        row = conn.execute("SELECT claude_session_id, model FROM threads WHERE id=?",
                            (turn.thread_id,)).fetchone()
         session_id = row["claude_session_id"] if row else None
+        # app default is sonnet — NEVER inherit the CLI default silently (the
+        # user's interactive default may be an expensive tier); "default"
+        # explicitly opts back into the CLI default
+        model = (row["model"] if row and row["model"] else "sonnet")
 
         # permissions ride on explicit flags: headless mode does not honor a
         # project .claude/settings.json in a directory without interactive trust
@@ -163,6 +167,8 @@ def _run_turn(turn, text):
                 "--disallowedTools", ",".join(denied),
                 "--add-dir", str(DATA),
                 "--append-system-prompt", SYSTEM_BLURB]
+        if model != "default":
+            argv += ["--model", model]
         if session_id:
             argv += ["--resume", session_id]
 

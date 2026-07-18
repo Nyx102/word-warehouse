@@ -1,7 +1,10 @@
 FROM python:3.12-slim
 
+# node 22 (NodeSource): runs claude-code, npm builds, and vite dev in-container
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git curl ca-certificates nodejs npm \
+        git curl ca-certificates wamerican \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && npm install -g @anthropic-ai/claude-code \
     && pip install --no-cache-dir pyyaml \
     && apt-get clean && rm -rf /var/lib/apt/lists/*

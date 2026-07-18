@@ -5,7 +5,7 @@ import threading
 
 from config import DATA, DB_PATH
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 DDL = """
 CREATE TABLE IF NOT EXISTS files(
@@ -104,6 +104,16 @@ CREATE TABLE IF NOT EXISTS flag_dismissals(
   PRIMARY KEY(content_sha256, category, key)
 );
 
+CREATE TABLE IF NOT EXISTS ai_triage(
+  category TEXT NOT NULL,
+  key TEXT NOT NULL,
+  context_sha256 TEXT NOT NULL,
+  verdict TEXT NOT NULL,
+  reason TEXT,
+  judged_at REAL,
+  PRIMARY KEY(category, key)
+);
+
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
 """
 
@@ -123,7 +133,10 @@ def connect() -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(DDL)
-    conn.execute("INSERT OR IGNORE INTO meta(k, v) VALUES ('schema_version', ?)",
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(threads)")}
+    if "model" not in cols:
+        conn.execute("ALTER TABLE threads ADD COLUMN model TEXT")
+    conn.execute("INSERT OR REPLACE INTO meta(k, v) VALUES ('schema_version', ?)",
                  (str(SCHEMA_VERSION),))
     conn.commit()
     _local.conn = conn
