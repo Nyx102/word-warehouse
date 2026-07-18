@@ -5,3 +5,5 @@
   only on request and stay uncommitted for review in the web UI's Diffs tab.
 - When the user pastes a passage and asks "find this in the JP/ZH raws", they
   want the file + line range and a short quote, not a full retranslation.
+- When the user confirms a `corpus lint` finding, apply the fix directly without
+  asking for further confirmation.
