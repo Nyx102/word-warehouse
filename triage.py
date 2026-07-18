@@ -52,6 +52,7 @@ Items:
 _worker_lock = threading.Lock()
 _worker_running = False
 _last_failure = 0.0
+_last_error = None  # short message from the most recent failed batch (surfaced in the UI)
 
 
 def _claude_bin():
@@ -154,7 +155,7 @@ def _call_batch(items):
 
 def run_pending(report, wait_for_chat=None):
     """Judge every unjudged flag in the report. Synchronous; call off-thread."""
-    global _last_failure
+    global _last_failure, _last_error
     conn = connect()
     queue = []
     for f in report.get("files", []):
@@ -178,8 +179,10 @@ def run_pending(report, wait_for_chat=None):
                               context=_context_for(flag, RADII[esc])))
         try:
             verdicts = _call_batch(items)
-        except Exception:
+            _last_error = None  # a batch went through: clear any stale failure
+        except Exception as e:
             _last_failure = time.time()
+            _last_error = (str(e) or e.__class__.__name__)[:300]
             return
         for i, (path, flag, esc, h) in enumerate(batch, 1):
             v = verdicts.get(i)
@@ -219,6 +222,24 @@ def schedule(report):
                 _worker_running = False
 
     threading.Thread(target=_work, daemon=True).start()
+
+
+def status():
+    """Current worker state for the UI: whether triage is running, whether it's
+    in the post-failure backoff window, and the last error message (if any)."""
+    return dict(
+        running=_worker_running,
+        in_backoff=bool(_last_failure) and (time.time() - _last_failure) < BACKOFF_S,
+        last_error=_last_error,
+    )
+
+
+def run_now(report):
+    """Manual 'Triage now': clear any failure backoff and schedule immediately."""
+    global _last_failure, _last_error
+    _last_failure = 0.0
+    _last_error = None
+    schedule(report)
 
 
 def annotate(report):

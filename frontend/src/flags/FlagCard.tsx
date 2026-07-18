@@ -31,10 +31,13 @@ export function markLocation(snippet: string | null | undefined, token: string |
   return esc(s);
 }
 
-export function FlagCard({ flag, dismissed, onToggleDismiss }: {
+export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen }: {
   flag: LintFlag;
   dismissed: boolean;
   onToggleDismiss: () => void;
+  // Open the flagged file at a line in the Files editor. Flag paths are
+  // CORPUS-relative; the Files editor is project-relative, so prefix 'corpus/'.
+  onOpen: (path: string, line?: number | null) => void;
 }) {
   const chipClass = 'chip '
     + (flag.category === 'nearmiss' ? 'chip-nearmiss' : 'chip-regression')
@@ -74,7 +77,11 @@ export function FlagCard({ flag, dismissed, onToggleDismiss }: {
       <div className="flag-locs">
         {(flag.locations || []).map((loc, i) => (
           <div className="loc" key={i}>
-            <span className="loc-path mono">{loc.path}:{loc.line}</span>
+            <button
+              className="loc-path mono loc-open"
+              title="Open in editor"
+              onClick={() => onOpen('corpus/' + loc.path, loc.line)}
+            >{loc.path}:{loc.line}</button>
             <span
               className="loc-snippet"
               dangerouslySetInnerHTML={{ __html: markLocation(loc.snippet, token, loc.col) }}

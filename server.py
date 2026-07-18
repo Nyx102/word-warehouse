@@ -7,8 +7,10 @@ fresh (5 s stat scan, purely local) and re-lints when anything changed.
 
 import argparse
 import json
+import os
 import queue
 import re
+import shutil
 import threading
 import time
 import traceback
@@ -20,7 +22,7 @@ import chat
 import checker
 import gitops
 import search as searchmod
-from config import CORPUS, DATA, HOST, PORT, RULES_YAML
+from config import CORPUS, DATA, FS_ROOT, HOST, PORT, RULES_YAML
 from db import connect
 from indexer import ensure_fresh
 
@@ -28,6 +30,7 @@ _APP_DIR = Path(__file__).resolve().parent
 _DIST = _APP_DIR / "frontend" / "dist"
 STATIC = _DIST if _DIST.is_dir() else _APP_DIR / "static"
 POLL_INTERVAL = 5
+MAX_BODY = 64 * 1024 * 1024  # reject oversize request bodies (uploads) up front
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
         ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
@@ -114,6 +117,11 @@ class Handler(BaseHTTPRequestHandler):
             # bytes a handler leaves unread stay in the socket and get parsed
             # as the next request's start-line -> "501 Unsupported method".
             n = int(self.headers.get("Content-Length") or 0)
+            if n > MAX_BODY:
+                # Don't buffer a huge body just to reject it; close the socket
+                # after the 413 so the undrained bytes can't desync keep-alive.
+                self.close_connection = True
+                return self._error("request body too large", 413)
             self._raw_body = self.rfile.read(n) if n > 0 else b""
             matched = False
             for pattern, methods, fn in ROUTES:
@@ -264,6 +272,117 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(ok=True,
                         sha256=hashlib.sha256(content.encode()).hexdigest()))
 
+    # -------------------------------------------------- files tab (/api/fs/*)
+    def _safe_fs_path(self, rel):
+        """Resolve a project-relative path under FS_ROOT (the Files-tab root).
+        Blocks traversal and any .git segment (ROOT/.git + the nested repo's)."""
+        if rel is None:
+            return None
+        rel = rel.strip().lstrip("/")
+        if ".git" in rel.split("/"):
+            return None
+        f = (FS_ROOT / rel).resolve()
+        if not f.is_relative_to(FS_ROOT):
+            return None
+        return f
+
+    def h_fs_list(self):
+        d = self._safe_fs_path(self._q("path", "") or "")
+        if d is None or not d.is_dir():
+            return self._error("not a directory", 404)
+        rel = str(d.relative_to(FS_ROOT)) if d != FS_ROOT else ""
+        entries = []
+        for e in os.scandir(d):
+            if e.name == ".git":
+                continue
+            try:
+                st = e.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            is_dir = e.is_dir(follow_symlinks=False)
+            entries.append(dict(
+                name=e.name,
+                path=(Path(rel) / e.name).as_posix() if rel else e.name,
+                is_dir=is_dir,
+                size=st.st_size,
+                mtime=st.st_mtime))
+        entries.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
+        self._json(dict(path=rel, entries=entries))
+
+    def h_fs_mkdir(self):
+        d = self._safe_fs_path(self._body().get("path", ""))
+        if d is None or d == FS_ROOT:
+            return self._error("bad path", 400)
+        if d.exists():
+            return self._error("already exists", 409)
+        d.mkdir(parents=True)
+        self._json(dict(ok=True))
+
+    def h_fs_create(self):
+        f = self._safe_fs_path(self._body().get("path", ""))
+        if f is None or f == FS_ROOT:
+            return self._error("bad path", 400)
+        if f.exists():
+            return self._error("already exists", 409)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("", encoding="utf-8")
+        self._json(dict(ok=True))
+
+    def h_fs_rename(self):
+        b = self._body()
+        src = self._safe_fs_path(b.get("path", ""))
+        dst = self._safe_fs_path(b.get("to", ""))
+        if src is None or dst is None or src == FS_ROOT or dst == FS_ROOT:
+            return self._error("bad path", 400)
+        if not src.exists():
+            return self._error("not found", 404)
+        if dst.exists():
+            return self._error("target exists", 409)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(src, dst)
+        self._json(dict(ok=True))
+
+    def h_fs_delete(self):
+        f = self._safe_fs_path(self._body().get("path", ""))
+        if f is None or f == FS_ROOT:
+            return self._error("bad path", 400)
+        if not f.exists():
+            return self._error("not found", 404)
+        if f.is_dir():
+            shutil.rmtree(f)
+        else:
+            f.unlink()
+        self._json(dict(ok=True))
+
+    def h_fs_download(self):
+        f = self._safe_fs_path(self._q("path", ""))
+        if f is None or not f.is_file():
+            return self._error("not found", 404)
+        name = f.name.replace('"', "")
+        self.send_response(200)
+        self.send_header("Content-Type",
+                         MIME.get(f.suffix.lower(), "application/octet-stream"))
+        self.send_header("Content-Length", str(f.stat().st_size))
+        self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+        self.end_headers()
+        with open(f, "rb") as fh:
+            while True:
+                chunk = fh.read(65536)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+
+    def h_fs_upload(self):
+        f = self._safe_fs_path(self._q("path", ""))
+        if f is None or f == FS_ROOT:
+            return self._error("bad path", 400)
+        data = getattr(self, "_raw_body", b"")
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(f.suffix + ".upload~")
+        tmp.write_bytes(data)
+        os.replace(tmp, f)
+        self._json(dict(ok=True, size=len(data)))
+
     def h_git_file(self):
         try:
             self._json(gitops.show(self._q("repo", "corpus"),
@@ -303,6 +422,14 @@ class Handler(BaseHTTPRequestHandler):
         _refresh_lint(force=True)
         self._json(dict(ok=True))
 
+    def h_triage_run(self):
+        """Manual 'Triage now': force a triage pass over the current flags,
+        clearing any failure backoff."""
+        import triage
+        report = _refresh_lint(scope="all")
+        triage.run_now(dict(report))
+        self._json(dict(ok=True, triage=triage.status()))
+
     def h_coverage(self):
         p = CORPUS / "notes/coverage.md"
         self._json(dict(markdown=p.read_text(encoding="utf-8")
@@ -330,6 +457,14 @@ class Handler(BaseHTTPRequestHandler):
             report = _refresh_lint(scope=scope)
         report = dict(report)
         triage.annotate(report)
+        # Auto-run triage when flags await review and the worker is idle (not
+        # already running, not in post-failure backoff). This is what actually
+        # drains "N awaiting review" — the poller only schedules on disk change.
+        st = triage.status()
+        if report.get("triage_pending", 0) > 0 and not st["running"] and not st["in_backoff"]:
+            triage.schedule(report)
+            st = triage.status()
+        report["triage"] = st
         self._json(report)
 
     def h_lint_dismiss(self):
@@ -459,6 +594,14 @@ ROUTES = [
     R(r"/api/file", {"PUT"}, Handler.h_file_put),
     R(r"/api/threads/(\d+)", {"PATCH"}, Handler.h_thread_patch),
     R(r"/api/triage/reject", {"POST"}, Handler.h_triage_reject),
+    R(r"/api/triage/run", {"POST"}, Handler.h_triage_run),
+    R(r"/api/fs/list", {"GET"}, Handler.h_fs_list),
+    R(r"/api/fs/mkdir", {"POST"}, Handler.h_fs_mkdir),
+    R(r"/api/fs/create", {"POST"}, Handler.h_fs_create),
+    R(r"/api/fs/rename", {"POST"}, Handler.h_fs_rename),
+    R(r"/api/fs/delete", {"POST"}, Handler.h_fs_delete),
+    R(r"/api/fs/download", {"GET"}, Handler.h_fs_download),
+    R(r"/api/fs/upload", {"POST"}, Handler.h_fs_upload),
 ]
 
 # GET+POST share /api/threads: dispatch by method

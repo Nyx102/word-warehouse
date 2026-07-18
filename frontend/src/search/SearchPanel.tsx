@@ -8,7 +8,10 @@ import type { SearchResult } from '../types';
 const LANGS = ['any', 'en', 'jp', 'zh', 'zh-s', 'zh-t'];
 const SOURCES = ['any', 'official', 'fan', 'jp', 'zh', 'raw', 'notes', 'docs'];
 
-export function SearchPanel({ active }: { active: boolean }) {
+export function SearchPanel({ active, onEditFile }: {
+  active: boolean;
+  onEditFile: (path: string, line?: number | null) => void;
+}) {
   const [q, setQ] = useState('');
   const [lang, setLang] = useState('any');
   const [series, setSeries] = useState('any');
@@ -110,6 +113,7 @@ export function SearchPanel({ active }: { active: boolean }) {
                 key={r.chunk_id}
                 r={r}
                 onOpenFile={(path, start) => setFileModal({ path, start })}
+                onEdit={(path, line) => onEditFile('corpus/' + path, line)}
               />
             ))}
           </>
@@ -124,6 +128,7 @@ export function SearchPanel({ active }: { active: boolean }) {
           path={fileModal.path}
           initialStart={fileModal.start}
           onClose={() => setFileModal(null)}
+          onEdit={(path, line) => { setFileModal(null); onEditFile('corpus/' + path, line); }}
         />
       )}
     </div>

@@ -13,6 +13,10 @@ CORPUS = Path(os.environ.get("WORKBENCH_CORPUS", str(ROOT / "corpus")))
 DATA = Path(os.environ.get("WORKBENCH_DATA", str(ROOT / "data")))
 DB_PATH = DATA / "corpus.db"
 
+# Files-tab browse/edit root. Defaults to the project (host-independent per the
+# no-host-paths rule); widen by setting WORKBENCH_FS_ROOT + a matching bind mount.
+FS_ROOT = Path(os.environ.get("WORKBENCH_FS_ROOT", str(ROOT))).resolve()
+
 REPO = CORPUS / "worldend2/repo"
 RULES_YAML = REPO / "Volumes/replacements.yaml"
 SCRIPTS_DIR = REPO / "Scripts"

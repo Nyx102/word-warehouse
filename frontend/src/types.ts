@@ -5,7 +5,16 @@ export type ThreadId = number | string;
 export type RepoName = 'corpus' | 'repo';
 export type ModelName = 'haiku' | 'sonnet' | 'opus' | 'default';
 export type LintScope = 'raw' | 'finished' | 'all';
-export type TabName = 'chat' | 'search' | 'flags' | 'diffs';
+export type TabName = 'chat' | 'search' | 'flags' | 'diffs' | 'files';
+
+/* ---- files tab ---- */
+export interface DirEntry {
+  name: string;
+  path: string;      // FS_ROOT-relative (posix)
+  is_dir: boolean;
+  size: number;
+  mtime: number;
+}
 
 /* ---- status ---- */
 
@@ -148,6 +157,7 @@ export interface LintReport {
   scope: string;
   total: number;
   triage_pending?: number;
+  triage?: { running: boolean; in_backoff: boolean; last_error: string | null };
   files: LintFile[];
 }
 

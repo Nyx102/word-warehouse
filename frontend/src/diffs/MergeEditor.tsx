@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorState, type Extension } from '@codemirror/state';
-import {
-  EditorView,
-  drawSelection,
-  highlightActiveLine,
-  keymap,
-  lineNumbers,
-} from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
-import { markdown } from '@codemirror/lang-markdown';
+import { EditorView } from '@codemirror/view';
 import {
   MergeView,
   goToNextChunk,
@@ -21,6 +11,7 @@ import { api, ApiError } from '../api';
 import { Modal } from '../components/Modal';
 import { toast } from '../components/Toasts';
 import { useMediaQuery } from '../util';
+import { baseExtensions, languageForPath } from '../editor/cm';
 import type { FileFull, GitFileResponse, RepoName } from '../types';
 
 interface Loaded {
@@ -189,25 +180,14 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
         setDirty(d !== savedRef.current);
       }
     });
-    const base: Extension[] = [
-      lineNumbers(),
-      highlightActiveLine(),
-      drawSelection(),
-      history(),
-      // Desktop wraps to fit the pane; mobile leaves long lines intact so the
-      // diff scrolls horizontally to reveal the full line (added below).
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      highlightSelectionMatches(),
-      keymap.of([
-        { key: 'Mod-s', run: () => { void saveRef.current(); return true; } },
-        ...defaultKeymap,
-        ...historyKeymap,
-        ...searchKeymap,
-        indentWithTab,
-      ]),
-    ];
-    if (isDesktop) base.push(EditorView.lineWrapping);
-    if (path.endsWith('.md')) base.push(markdown());
+    // Desktop wraps to fit the pane; mobile leaves long lines intact so the
+    // diff scrolls horizontally to reveal the full line.
+    const base: Extension[] = baseExtensions({
+      onSave: () => { void saveRef.current(); },
+      wrap: isDesktop,
+    });
+    const lang = languageForPath(path);
+    if (lang) base.push(lang);
 
     if (isDesktop) {
       const mv = new MergeView({

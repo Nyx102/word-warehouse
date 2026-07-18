@@ -7,10 +7,11 @@ import type { FilePage } from '../types';
 const PAGE = 200;
 
 /** Windowed file viewer: pages through /api/file?path&start&count. */
-export function ChunkModal({ path, initialStart, onClose }: {
+export function ChunkModal({ path, initialStart, onClose, onEdit }: {
   path: string;
   initialStart: number;
   onClose: () => void;
+  onEdit?: (path: string, line: number) => void;
 }) {
   const [start, setStart] = useState(Math.max(1, initialStart || 1));
 
@@ -41,6 +42,9 @@ export function ChunkModal({ path, initialStart, onClose }: {
           <span className="dim">
             {d ? `lines ${effStart}–${end} of ${total}` : page.error ? 'failed to load' : 'loading…'}
           </span>
+          {onEdit && (
+            <button className="btn" onClick={() => onEdit(path, effStart)}>Open in editor</button>
+          )}
           <button
             className="btn"
             disabled={!d || end >= total || page.loading}

@@ -7,9 +7,10 @@ import { ThreadList, useThreads } from './chat/ThreadList';
 import { SearchPanel } from './search/SearchPanel';
 import { FlagsPanel } from './flags/FlagsPanel';
 import { DiffsPanel } from './diffs/DiffsPanel';
+import { FilesPanel } from './files/FilesPanel';
 import type { RepoName, TabName } from './types';
 
-const TAB_NAMES: TabName[] = ['chat', 'search', 'flags', 'diffs'];
+const TAB_NAMES: TabName[] = ['chat', 'search', 'flags', 'diffs', 'files'];
 
 function tabFromHash(): TabName {
   const h = window.location.hash.replace(/^#\/?/, '');
@@ -20,6 +21,7 @@ export default function App() {
   // Tab state lives in useState and mirrors into location.hash (no router).
   const [tab, setTab] = useState<TabName>(tabFromHash);
   const [diffsRepo, setDiffsRepo] = useState<RepoName>('corpus');
+  const [filesTarget, setFilesTarget] = useState<{ path: string; line?: number | null } | null>(null);
   const [chatBusy, setChatBusy] = useState(false);
   const { status, refresh } = useStatus();
   const threadsApi = useThreads();
@@ -40,6 +42,13 @@ export default function App() {
     selectTab('diffs');
   }, [selectTab]);
 
+  // Open a file in the Files editor (optionally scrolled to a line). Used by the
+  // Flags "Open" action and Search "open in editor" to fix things on the web.
+  const openInFiles = useCallback((path: string, line?: number | null) => {
+    setFilesTarget({ path, line: line ?? null });
+    selectTab('files');
+  }, [selectTab]);
+
   // All panels stay mounted (CSS-hidden when inactive) so the chat SSE
   // stream, search results and editor state survive tab switches.
   return (
@@ -56,10 +65,10 @@ export default function App() {
           <ChatPanel threadsApi={threadsApi} onTurnActiveChange={setChatBusy} />
         </section>
         <section className={'panel' + (tab === 'search' ? ' active' : '')}>
-          <SearchPanel active={tab === 'search'} />
+          <SearchPanel active={tab === 'search'} onEditFile={openInFiles} />
         </section>
         <section className={'panel' + (tab === 'flags' ? ' active' : '')}>
-          <FlagsPanel active={tab === 'flags'} />
+          <FlagsPanel active={tab === 'flags'} onOpenFile={openInFiles} />
         </section>
         <section className={'panel' + (tab === 'diffs' ? ' active' : '')}>
           <DiffsPanel
@@ -67,6 +76,13 @@ export default function App() {
             onRepoChange={setDiffsRepo}
             active={tab === 'diffs'}
             onGlobalRefresh={refresh}
+          />
+        </section>
+        <section className={'panel' + (tab === 'files' ? ' active' : '')}>
+          <FilesPanel
+            active={tab === 'files'}
+            target={filesTarget}
+            onConsumeTarget={() => setFilesTarget(null)}
           />
         </section>
       </Shell>

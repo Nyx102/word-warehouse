@@ -5,12 +5,16 @@ import { FlagCard, flagIdent } from './FlagCard';
 import { ScopeSegment } from './ScopeSegment';
 import type { LintFlag, LintReport, LintScope } from '../types';
 
-export function FlagsPanel({ active }: { active: boolean }) {
+export function FlagsPanel({ active, onOpenFile }: {
+  active: boolean;
+  onOpenFile: (path: string, line?: number | null) => void;
+}) {
   const [scope, setScope] = useState<LintScope>('all');
   const [showDismissed, setShowDismissed] = useState(false);
   const [report, setReport] = useState<LintReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [rerunning, setRerunning] = useState(false);
+  const [triaging, setTriaging] = useState(false);
   // optimistic dismissed-state overrides: ident -> dismissed?
   const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
   const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
@@ -43,12 +47,15 @@ export function FlagsPanel({ active }: { active: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
-  // poll while AI triage is still working through flags
+  // Poll while triage has flags to work through — but stop if it reported an
+  // error (the server won't auto-retry until backoff clears), so the spinner
+  // can't spin forever. "Triage now" is the manual escape hatch.
+  const triageErr = report?.triage?.last_error;
   useEffect(() => {
-    if (!report?.triage_pending) return;
+    if (!report?.triage_pending || triageErr) return;
     const t = window.setInterval(() => { void load(true); }, 10000);
     return () => window.clearInterval(t);
-  }, [report?.triage_pending, load]);
+  }, [report?.triage_pending, triageErr, load]);
 
   const rerun = async () => {
     setRerunning(true);
@@ -59,6 +66,18 @@ export function FlagsPanel({ active }: { active: boolean }) {
       /* toast shown */
     } finally {
       setRerunning(false);
+    }
+  };
+
+  const triageNow = async () => {
+    setTriaging(true);
+    try {
+      await api('/api/triage/run', { method: 'POST', body: {} });
+      await load(true);
+    } catch {
+      /* toast shown */
+    } finally {
+      setTriaging(false);
     }
   };
 
@@ -127,9 +146,21 @@ export function FlagsPanel({ active }: { active: boolean }) {
           {report ? `${report.total} flag${report.total === 1 ? '' : 's'}` : ''}
         </span>
         {!!report?.triage_pending && (
-          <span className="triage-pending" title="AI triage in progress">
-            <span className="spinner" /> {report.triage_pending} pending triage
+          <span
+            className="triage-pending"
+            title="A cheap model (haiku) reviews each flag and clears the clearly-intentional ones"
+          >
+            {report.triage?.running && !triageErr && <span className="spinner" />}
+            {report.triage_pending} awaiting AI review
           </span>
+        )}
+        {triageErr && (
+          <span className="triage-error" title={triageErr}>AI review failed</span>
+        )}
+        {!!report?.triage_pending && (
+          <button className="btn" onClick={() => void triageNow()} disabled={triaging || report.triage?.running}>
+            {triaging || report.triage?.running ? 'Reviewing…' : triageErr ? 'Retry review' : 'Triage now'}
+          </button>
         )}
         <button className="btn" onClick={() => void rerun()} disabled={rerunning}>
           {rerunning ? 'Running…' : 'Re-run'}
@@ -162,6 +193,7 @@ export function FlagsPanel({ active }: { active: boolean }) {
                 flag={fl}
                 dismissed={isDismissed(fl)}
                 onToggleDismiss={() => void toggleDismiss(fl)}
+                onOpen={onOpenFile}
               />
             ))}
           </details>

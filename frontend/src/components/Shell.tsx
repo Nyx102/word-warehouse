@@ -8,6 +8,7 @@ const TABS: { id: TabName; label: string }[] = [
   { id: 'search', label: 'Search' },
   { id: 'flags', label: 'Flags' },
   { id: 'diffs', label: 'Diffs' },
+  { id: 'files', label: 'Files' },
 ];
 
 /** App chrome: top bar (tabs + status pills) on desktop, fixed bottom tab bar

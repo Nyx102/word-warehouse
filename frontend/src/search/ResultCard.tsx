@@ -16,9 +16,10 @@ interface CtxChunk {
   hit: boolean;
 }
 
-export function ResultCard({ r, onOpenFile }: {
+export function ResultCard({ r, onOpenFile, onEdit }: {
   r: SearchResult;
   onOpenFile: (path: string, start: number) => void;
+  onEdit: (path: string, line: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [ctx, setCtx] = useState<CtxChunk[] | null>(null);
@@ -73,7 +74,14 @@ export function ResultCard({ r, onOpenFile }: {
           {r.lang && <span className="lang-tag">{r.lang}</span>}
           <span className="card-meta">{meta.join(' · ')}</span>
         </div>
-        <div className="card-path mono">{r.path}:{r.start_line}-{r.end_line}</div>
+        <div className="card-path mono">
+          {r.path}:{r.start_line}-{r.end_line}
+          <button
+            className="linkish card-edit"
+            title="Open in the Files editor"
+            onClick={(e) => { e.stopPropagation(); onEdit(r.path, r.start_line || 1); }}
+          >edit</button>
+        </div>
         <div className="card-snippet" dangerouslySetInnerHTML={{ __html: markSnippet(r.snippet || '') }} />
       </div>
       {open && (
