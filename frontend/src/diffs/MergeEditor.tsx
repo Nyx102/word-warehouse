@@ -11,7 +11,12 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { markdown } from '@codemirror/lang-markdown';
-import { MergeView, unifiedMergeView } from '@codemirror/merge';
+import {
+  MergeView,
+  goToNextChunk,
+  goToPreviousChunk,
+  unifiedMergeView,
+} from '@codemirror/merge';
 import { api, ApiError } from '../api';
 import { Modal } from '../components/Modal';
 import { toast } from '../components/Toasts';
@@ -71,7 +76,12 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
   const [confirmRevert, setConfirmRevert] = useState(false);
 
   const hostRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<{ getDoc: () => string; destroy: () => void } | null>(null);
+  const viewRef = useRef<{
+    getDoc: () => string;
+    goPrev: () => void; // jump to previous changed chunk (no focus: keeps the
+    goNext: () => void; // mobile keyboard closed while stepping through diffs)
+    destroy: () => void;
+  } | null>(null);
   const fileRef = useRef<Loaded | null>(null);
   fileRef.current = file;
   const savedRef = useRef('');            // last loaded/saved content
@@ -210,6 +220,8 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
       });
       viewRef.current = {
         getDoc: () => mv.b.state.doc.toString(),
+        goPrev: () => { goToPreviousChunk(mv.b); },
+        goNext: () => { goToNextChunk(mv.b); },
         destroy: () => mv.destroy(),
       };
     } else {
@@ -220,12 +232,20 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
           extensions: [
             ...base,
             listener,
-            unifiedMergeView({ original: file.original, mergeControls: true }),
+            unifiedMergeView({
+              original: file.original,
+              mergeControls: true,
+              // Fold away unchanged runs so the diffs are on screen at once
+              // instead of buried in a full-file scroll (mobile's main pain).
+              collapseUnchanged: { margin: 3, minSize: 4 },
+            }),
           ],
         }),
       });
       viewRef.current = {
         getDoc: () => view.state.doc.toString(),
+        goPrev: () => { goToPreviousChunk(view); },
+        goNext: () => { goToNextChunk(view); },
         destroy: () => view.destroy(),
       };
     }
@@ -255,6 +275,22 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
         <span className="editor-path mono" title={path}>{path}</span>
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         <span className="toolbar-spacer" />
+        {!isDesktop && editable && (
+          <span className="chunk-nav" role="group" aria-label="Jump between changes">
+            <button
+              className="btn btn-sm"
+              onClick={() => viewRef.current?.goPrev()}
+              title="Previous change"
+              aria-label="Previous change"
+            >↑</button>
+            <button
+              className="btn btn-sm"
+              onClick={() => viewRef.current?.goNext()}
+              title="Next change"
+              aria-label="Next change"
+            >↓</button>
+          </span>
+        )}
         <button
           className="btn btn-sm primary"
           onClick={() => void save()}
