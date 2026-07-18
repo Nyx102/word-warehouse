@@ -194,7 +194,8 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
       highlightActiveLine(),
       drawSelection(),
       history(),
-      EditorView.lineWrapping,
+      // Desktop wraps to fit the pane; mobile leaves long lines intact so the
+      // diff scrolls horizontally to reveal the full line (added below).
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       highlightSelectionMatches(),
       keymap.of([
@@ -205,6 +206,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
         indentWithTab,
       ]),
     ];
+    if (isDesktop) base.push(EditorView.lineWrapping);
     if (path.endsWith('.md')) base.push(markdown());
 
     if (isDesktop) {

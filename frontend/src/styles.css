@@ -48,6 +48,11 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
+html {
+  /* keep iOS from inflating text (and thus "zooming") in landscape */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   margin: 0;
   font-family: var(--sans);
@@ -56,6 +61,9 @@ body {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+  /* app-like touch: no double-tap zoom, no rubber-band / pull-to-refresh */
+  touch-action: manipulation;
+  overscroll-behavior: none;
 }
 .mono { font-family: var(--mono); }
 .dim { color: var(--text-dim); }
@@ -834,7 +842,7 @@ mark {
   flex: none;
 }
 
-.merge-host { flex: 1; min-height: 0; overflow: auto; }
+.merge-host { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
 .merge-host .cm-mergeView { height: 100%; }
 .merge-host > .cm-editor { height: 100%; }
 .cm-editor { font-size: 13px; background: var(--bg-panel); }

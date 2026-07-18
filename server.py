@@ -31,7 +31,9 @@ POLL_INTERVAL = 5
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
         ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
-        ".png": "image/png", ".ico": "image/x-icon"}
+        ".png": "image/png", ".ico": "image/x-icon",
+        ".json": "application/json; charset=utf-8",
+        ".webmanifest": "application/manifest+json; charset=utf-8"}
 
 _lint_cache = {"reports": {}, "lock": threading.Lock()}
 
