@@ -27,7 +27,9 @@ python3 server.py --host 127.0.0.1  # local testing
 | `indexer.py` | segmentation per source format; JP ruby-strip + trad→simp shadow columns; SQLite FTS5 (unicode61 for EN, trigram for CJK) |
 | `search.py` | query routing EN/JP/ZH, LIKE fallback for short CJK, chapter alignment via `-subtitle-` join keys |
 | `checker.py` | lint: near-miss typos (edit-distance vs replacements.yaml vocab, official-EN whitelist) + leftover-term regression with exact rule simulation |
-| `chat.py` | claude CLI headless (stream-json, `--resume` per thread); permissions via flags; **credits are spent only here** |
+| `chat.py` | claude CLI headless (stream-json, `--resume` per thread); permissions via flags (allow: read/search/edit + corpus CLI + read-only git; deny: commit/push/rm/sudo); **default model sonnet**, per-thread picker in the UI; credits are spent only here and in triage |
+| `triage.py` | AI flag adjudication: haiku judges lint flags from context (±2→±10→±30 line escalation, max 2), conservative, per-file verdict cache — unchanged text is never re-judged |
+| `frontend/` | React + Vite + TS + CodeMirror UI (mobile bottom-nav; editable merge-view diffs). Rebuild after changes: `docker compose exec workbench sh -c 'cd frontend && npm run build'`; HMR dev server: `npm run dev` in-container on :5173 |
 | `corpus_cli.py` | the `corpus` command (symlinked into `~/.local/bin` and the container): search / context / align / terms / lint / sniff / status / reindex |
 | `scripts/reorg.py` | one-shot corpus reorganization (already executed 2026-07-17) |
 | `scripts/coverage.py` | regenerates `corpus/notes/coverage.md` |
