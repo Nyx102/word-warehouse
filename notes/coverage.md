@@ -1,6 +1,6 @@
 # Corpus coverage
 
-_Generated 2026-07-17 by app/scripts/coverage.py — rerun after adding sources._
+_Generated 2026-07-18 by app/scripts/coverage.py — rerun after adding sources._
 
 ## WorldEnd / SukaSuka (series 1 — complete: 5 volumes + EX)
 
@@ -30,8 +30,8 @@ Notes:
 | v07 | — | ✓ | ✓ |
 | v08 | — | ✓ | ✓ |
 | v09 | — | ✓ | ✓ |
-| v10 | — | ⚠ partial | ✓ |  ← JP is a preview/sample rip (~20% of body) — re-source full ebook
-| v11 | — | ⚠ partial | ✓ |  ← JP is a preview/sample rip (~20% of body) — re-source full ebook
+| v10 | — | ✓ | ✓ |
+| v11 | — | ✓ | ✓ |
 
 Notes:
 - No official EN exists for series 2 (Yen Press licensed series 1 only).
@@ -39,4 +39,4 @@ Notes:
 - ZH v01–v04: simplified primaries plus traditional `-traditional` alternates (independent edition); ZH v05–v11 are traditional only.
 
 ## Shopping list (true gaps)
-- Full JP ebook rips of SukaMoka #10 and #11 — current files are preview/sample editions (complete front matter + TOC, ~20% of body, then legal back matter; no afterword).
+- None — every volume present in every expected language.
