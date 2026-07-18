@@ -1,19 +1,24 @@
-"""Shared paths and file classification for the WorldEnd workbench."""
+"""Shared paths and file classification for Word Warehouse.
+
+Everything derives from ROOT (this file's directory) — the project is
+host-independent; never hardcode absolute paths."""
 
 import os
 import re
 from pathlib import Path
 
-CORPUS = Path(os.environ.get("WORKBENCH_CORPUS", "/home/ubuntu/worldend/corpus"))
-APP = Path(__file__).resolve().parent
-DATA = Path(os.environ.get("WORKBENCH_DATA", str(APP / "data")))
+ROOT = Path(__file__).resolve().parent
+APP = ROOT  # legacy alias
+CORPUS = Path(os.environ.get("WORKBENCH_CORPUS", str(ROOT / "corpus")))
+DATA = Path(os.environ.get("WORKBENCH_DATA", str(ROOT / "data")))
 DB_PATH = DATA / "corpus.db"
 
 REPO = CORPUS / "worldend2/repo"
 RULES_YAML = REPO / "Volumes/replacements.yaml"
 SCRIPTS_DIR = REPO / "Scripts"
 
-HOST = os.environ.get("WORKBENCH_HOST", "100.111.187.66")
+# bare-host default is loopback; the container CMD passes --host 0.0.0.0
+HOST = os.environ.get("WORKBENCH_HOST", "127.0.0.1")
 PORT = int(os.environ.get("WORKBENCH_PORT", "8686"))
 
 # glob patterns (relative to CORPUS) that make up the index, and nothing else

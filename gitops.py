@@ -3,9 +3,11 @@
 import re
 import subprocess
 
-from config import CORPUS, REPO
+from config import REPO, ROOT
 
-REPOS = {"corpus": CORPUS, "repo": REPO}
+# "corpus" is the unified project repo (code + corpus data, user decision);
+# "repo" is the nested translation repo. API key names are frozen contract.
+REPOS = {"corpus": ROOT, "repo": REPO}
 
 
 def _run(repo, *args, check=True):

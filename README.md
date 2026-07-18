@@ -1,22 +1,25 @@
-# WorldEnd Translation Workbench
+# Word Warehouse
 
 Self-hosted workbench for the WorldEnd2 (SukaMoka) fan translation: indexed
 search over every source (official EN, fan EN, JP raws, ZH raws in both
-scripts), a consistency checker, cross-language chapter alignment, git-visible
-editing, and a chat assistant (Claude, via your Claude Code subscription) with
-agentic access to all of it.
+scripts), a consistency checker with AI triage, cross-language chapter
+alignment, git-visible editing with an in-browser merge editor, and a chat
+assistant (Claude, via your Claude Code subscription) with agentic access to
+all of it. One unified, host-independent project: the corpus lives in
+`corpus/`, and everything resolves relative to the project root (see
+CLAUDE.md's iron rule — no hardcoded paths).
 
 ## Run
 
 ```sh
-docker compose up -d --build        # serves http://100.111.187.66:8686 (mesh only)
+docker compose up -d --build        # serves :8686 on all interfaces
 ```
 
 or directly on the host (same behavior, no container):
 
 ```sh
-python3 server.py                   # binds 100.111.187.66:8686
-python3 server.py --host 127.0.0.1  # local testing
+python3 server.py                   # binds 127.0.0.1:8686
+python3 server.py --host 0.0.0.0    # expose beyond loopback
 ```
 
 ## Pieces
@@ -37,7 +40,7 @@ python3 server.py --host 127.0.0.1  # local testing
 
 ## Data & state
 
-- Index DB: `app/data/corpus.db` (disposable — rebuilt automatically).
+- Index DB: `data/corpus.db` (disposable — rebuilt automatically).
 - Chat threads/messages: same DB. Deleting a thread deletes its history.
 - Claude sessions: `~/.claude` (mounted into the container; cwd-keyed, so host
   and container share sessions).

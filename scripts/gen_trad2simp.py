@@ -11,8 +11,12 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
-CORPUS = Path("/home/ubuntu/worldend/corpus")
-OUT = Path("/home/ubuntu/worldend/app/trad2simp.py")
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from config import CORPUS, ROOT  # noqa: E402
+
+OUT = ROOT / "trad2simp.py"
 
 # high-confidence manual seed (common chars; also covers pairs the harvest may miss)
 SEED = {

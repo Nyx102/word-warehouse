@@ -3,9 +3,11 @@
 
 import datetime
 import re
+import sys
 from pathlib import Path
 
-CORPUS = Path("/home/ubuntu/worldend/corpus")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from config import CORPUS  # noqa: E402
 
 S1_VOLS = ["v01", "v02", "v03", "v04", "v05", "ex"]
 S2_TOTAL = 11  # series complete at #11 (Kadokawa Sneaker Bunko, 2021-07)

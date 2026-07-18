@@ -1,16 +1,15 @@
 services:
   workbench:
     build: .
-    container_name: worldend-workbench
+    container_name: word-warehouse
     restart: unless-stopped
     ports:
       - "8686:8686"
       - "5173:5173"
     volumes:
-      - /home/ubuntu/worldend/corpus:/home/ubuntu/worldend/corpus
-      - /home/ubuntu/worldend/app:/home/ubuntu/worldend/app
-      - /home/ubuntu/.claude:/root/.claude
-      - /home/ubuntu/.gitconfig:/root/.gitconfig:ro
+      - .:/word-warehouse
+      - ~/.claude:/root/.claude
+      - ~/.gitconfig:/root/.gitconfig:ro
     mem_limit: 3g
     environment:
       - WORKBENCH_CLAUDE_BIN=claude
