@@ -78,10 +78,10 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": message}, code)
 
     def _body(self):
-        n = int(self.headers.get("Content-Length") or 0)
-        if not n:
+        raw = getattr(self, "_raw_body", b"")
+        if not raw:
             return {}
-        return json.loads(self.rfile.read(n).decode())
+        return json.loads(raw.decode())
 
     def _q(self, name, default=None):
         vals = self.query.get(name)
@@ -108,6 +108,11 @@ class Handler(BaseHTTPRequestHandler):
         self.query = parse_qs(parsed.query)
         path = unquote(parsed.path)
         try:
+            # Drain the request body up front. With HTTP/1.1 keep-alive, any
+            # bytes a handler leaves unread stay in the socket and get parsed
+            # as the next request's start-line -> "501 Unsupported method".
+            n = int(self.headers.get("Content-Length") or 0)
+            self._raw_body = self.rfile.read(n) if n > 0 else b""
             matched = False
             for pattern, methods, fn in ROUTES:
                 m = pattern.match(path)
