@@ -111,19 +111,23 @@ def _cached(conn, path, flag):
 
 
 def _needs_judgment(conn, path, flag):
+    """-> (needs: bool, current_base_hash). The hash is computed ONCE here and
+    carried through the batch so the stored verdict is pinned to the context
+    the model actually saw, not whatever is on disk after the call returns."""
+    h = _base_hash(flag)
     row = _cached(conn, path, flag)
     if row is None:
-        return True
+        return True, h
     if row["context_sha256"] == "*":  # user override — permanent
-        return False
-    return row["context_sha256"] != _base_hash(flag)
+        return False, h
+    return row["context_sha256"] != h, h
 
 
-def _store(conn, path, flag, verdict, reason):
+def _store(conn, path, flag, verdict, reason, base_hash):
     conn.execute(
         "INSERT OR REPLACE INTO ai_triage(category, key, context_sha256, verdict,"
         " reason, judged_at) VALUES (?,?,?,?,?,?)",
-        (flag["category"], _key(path, flag), _base_hash(flag), verdict, reason,
+        (flag["category"], _key(path, flag), base_hash, verdict, reason,
          time.time()))
     conn.commit()
 
@@ -157,8 +161,9 @@ def run_pending(report, wait_for_chat=None):
         for flag in f["flags"]:
             if flag.get("dismissed"):
                 continue
-            if _needs_judgment(conn, f["path"], flag):
-                queue.append([f["path"], flag, 0])  # [path, flag, escalation]
+            needs, h = _needs_judgment(conn, f["path"], flag)
+            if needs:
+                queue.append([f["path"], flag, 0, h])  # [path, flag, esc, hash]
 
     while queue:
         if time.time() - _last_failure < BACKOFF_S:
@@ -167,7 +172,7 @@ def run_pending(report, wait_for_chat=None):
             wait_for_chat()
         batch, queue = queue[:BATCH], queue[BATCH:]
         items = []
-        for i, (path, flag, esc) in enumerate(batch, 1):
+        for i, (path, flag, esc, h) in enumerate(batch, 1):
             items.append(dict(id=i, category=flag["category"],
                               **_flag_info(flag),
                               context=_context_for(flag, RADII[esc])))
@@ -176,19 +181,19 @@ def run_pending(report, wait_for_chat=None):
         except Exception:
             _last_failure = time.time()
             return
-        for i, (path, flag, esc) in enumerate(batch, 1):
+        for i, (path, flag, esc, h) in enumerate(batch, 1):
             v = verdicts.get(i)
             if not v or v.get("verdict") not in ("keep", "clear", "need_more"):
                 continue  # fail-closed: stays pending/visible
             if v["verdict"] == "need_more":
                 if esc + 1 < len(RADII):
-                    queue.append([path, flag, esc + 1])
+                    queue.append([path, flag, esc + 1, h])
                 else:
                     _store(conn, path, flag, "keep",
-                           "needs human review (context escalations exhausted)")
+                           "needs human review (context escalations exhausted)", h)
             else:
                 _store(conn, path, flag, v["verdict"],
-                       (v.get("reason") or "")[:300])
+                       (v.get("reason") or "")[:300], h)
 
 
 def schedule(report):
@@ -236,10 +241,18 @@ def annotate(report):
 
 def user_override(category, key):
     """The human disagrees with an AI 'clear' — pin the flag as kept forever.
-    Applies across all files (wildcard path key)."""
+    Deletes every per-file row for the key (they would shadow the wildcard in
+    _cached), then writes the wildcard override."""
     conn = connect()
+    suffix = f"::{key}"
+    stale = [r["key"] for r in conn.execute(
+        "SELECT key FROM ai_triage WHERE category=?", (category,))
+        if r["key"].endswith(suffix)]
+    for k in stale:
+        conn.execute("DELETE FROM ai_triage WHERE category=? AND key=?",
+                     (category, k))
     conn.execute(
         "INSERT OR REPLACE INTO ai_triage(category, key, context_sha256, verdict,"
         " reason, judged_at) VALUES (?,?,'*','keep','user override',?)",
-        (category, f"*::{key}", time.time()))
+        (category, f"*{suffix}", time.time()))
     conn.commit()

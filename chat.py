@@ -233,15 +233,20 @@ def _pump(turn, conn):
 
         elif et == "stream_event":
             inner = ev.get("event") or {}
+            # ephemeral events get their own seq too: the client dedupes on
+            # (turn, seq), so sharing the previous event's seq would swallow
+            # every streamed delta after the first
             if inner.get("type") == "content_block_delta":
                 delta = inner.get("delta") or {}
                 if delta.get("type") == "text_delta" and delta.get("text"):
                     text_acc.append(delta["text"])
+                    turn.seq += 1
                     turn.publish(dict(kind="text_delta", text=delta["text"],
                                       turn=turn.turn_no, seq=turn.seq))
             elif inner.get("type") == "content_block_start":
                 block = inner.get("content_block") or {}
                 if block.get("type") == "thinking":
+                    turn.seq += 1
                     turn.publish(dict(kind="thinking", turn=turn.turn_no,
                                       seq=turn.seq))
 

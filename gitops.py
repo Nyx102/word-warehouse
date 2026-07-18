@@ -82,15 +82,20 @@ def show(repo, path, rev="HEAD"):
 
 
 def revert(repo, path):
-    """git restore a tracked file; refuse untracked (never delete data)."""
+    """git restore a file to its HEAD state; refuse whenever the path has no
+    HEAD version (untracked, staged-new, rename target) — restore would then
+    DELETE the file rather than revert it, and this endpoint never deletes."""
     _safe_rel(path)
     st = _run(repo, "status", "--porcelain", "--", path)
-    if st.startswith("??"):
-        raise RuntimeError(
-            f"{path} is untracked; nothing in git to restore — delete the file"
-            " manually if it is unwanted")
     if not st.strip():
         return  # already clean
+    at_head = subprocess.run(
+        ["git", "-C", str(REPOS[repo]), "cat-file", "-e", f"HEAD:{path}"],
+        capture_output=True)
+    if at_head.returncode != 0:
+        raise RuntimeError(
+            f"{path} has no committed version (untracked or newly staged);"
+            " restoring would delete it — remove the file manually if unwanted")
     _run(repo, "restore", "--staged", "--worktree", "--", path)
 
 
