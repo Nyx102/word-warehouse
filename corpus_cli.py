@@ -176,7 +176,8 @@ def cmd_reindex(args):
 def cmd_lint(args):
     import checker
     try:
-        checker.cli_lint(args.path, verbose=args.verbose)
+        checker.cli_lint(args.path, verbose=args.verbose, scope=args.scope,
+                         triage=args.triage)
     except FileNotFoundError as e:
         sys.exit(str(e))
 
@@ -218,6 +219,9 @@ def main():
     s = sub.add_parser("lint", help="consistency check (near-misses, leftovers)")
     s.add_argument("path", nargs="?")
     s.add_argument("--verbose", action="store_true")
+    s.add_argument("--scope", choices=["raw", "finished", "all"], default="all")
+    s.add_argument("--triage", action="store_true",
+                   help="run AI triage on pending flags and show verdicts")
     s.set_defaults(fn=cmd_lint)
 
     s = sub.add_parser("status", help="index freshness and stats")

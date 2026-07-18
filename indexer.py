@@ -41,6 +41,25 @@ RUBY = re.compile(r"(?<=[一-鿿])[ぁ-ゖ]{1,3}(?=[一-鿿])")
 PARTICLES = ("の", "が", "を", "に", "で", "と", "は", "も", "や", "へ")
 
 
+JUNK_IMG_REF = re.compile(r"^\[image\d+\]:\s*<")
+
+
+def strip_binary_junk(text: str) -> str:
+    """Blank out embedded-binary lines (base64 image defs from Google-Docs
+    exports). Lines become "" — never deleted — so every line number in chunks
+    and lint locations still matches the on-disk file."""
+    out = []
+    for line in text.split("\n"):
+        s = line.strip()
+        if (JUNK_IMG_REF.match(line)
+                or (";base64," in line and len(line) > 500)
+                or (len(s) > 300 and " " not in s)):
+            out.append("")
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def sniff_lang(text: str) -> str:
     sample = text[:50000]
     kana = sum(1 for c in sample if "぀" <= c <= "ヿ")
@@ -404,6 +423,9 @@ def index_file(conn, meta, text, sha):
         (rel, meta["source"], lang, meta["series"], meta["volume"],
          meta["mtime"], meta["size"], sha, time.time()))
     file_id = cur.lastrowid
+
+    if meta["source"] in ("raw", "inbox"):
+        text = strip_binary_junk(text)
 
     if meta["source"] == "fan":
         chapters, chunks = segment_fan_md(text, meta["volume"], meta["chapter_label"])

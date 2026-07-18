@@ -92,9 +92,14 @@ def main():
         " (independent edition); ZH v05–v11 are traditional only.",
         "",
         "## Shopping list (true gaps)",
-        "- Full JP ebook rips of SukaMoka #10 and #11 — current files are preview/sample editions"
-        " (complete front matter + TOC, ~20% of body, then legal back matter; no afterword).",
     ]
+    partial = [f"v{n:02d}" for n in range(1, S2_TOTAL + 1)
+               if mark(CORPUS / f"worldend2/jp/v{n:02d}.txt") == "⚠ partial"]
+    if partial:
+        lines.append(f"- Full JP ebook rips of SukaMoka {', '.join(partial)} — current"
+                     " files are preview/sample editions.")
+    else:
+        lines.append("- None — every volume present in every expected language.")
 
     out = CORPUS / "notes/coverage.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")

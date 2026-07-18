@@ -7,6 +7,12 @@
 - regression: a replacement-rule `find` still matching finished prose. Exact:
   a match is only a regression if the rule would actually rewrite it there
   (sentence_aware / preserve_case / no-op cases are simulated, not guessed).
+  NOTE on semantics: the reference Scripts/regex_replace.py applies rules
+  SEQUENTIALLY (each on the previous rule's output); this checker applies each
+  rule independently to the on-disk text. Immaterial for finished prose: it is
+  supposed to be a fixed point of the whole pipeline, so any single rule that
+  would rewrite it is a true regression, and the earliest-diverging rule is
+  detected identically either way — only downstream cascade detail can differ.
 
 Dismissals are global per (category, key) — stable across edits and renames.
 """
@@ -40,7 +46,7 @@ def _deregex(s: str) -> str:
     classes and alternations into BOTH variants ([Ff]airy -> Fairy fairy,
     Ayrantro(b|p)os -> Ayrantrobos Ayrantropos), strips \\b and (?!...)."""
     variants = [s]
-    for pat in (r"\[([A-Za-z])([A-Za-z])\]", r"\((\w)\|(\w)\)"):
+    for pat in (r"\[([A-Za-z])([A-Za-z])\]", r"\((\w)\|(\w)\)", r"(\w)()\?"):
         expanded = []
         for v in variants:
             expanded.append(re.sub(pat, r"\1", v))
@@ -193,6 +199,13 @@ def _match_token(base):
     return verdict
 
 
+def _centered_snippet(line, start, end, radius=60):
+    """Window around the match so the flagged token is always visible."""
+    a, b = max(0, start - radius), min(len(line), end + radius)
+    return (("…" if a > 0 else "") + line[a:b].strip()
+            + ("…" if b < len(line) else ""))
+
+
 def check_nearmiss(text, rel):
     occurrences = defaultdict(list)
     for ln, line in enumerate(text.splitlines(), 1):
@@ -201,14 +214,15 @@ def check_nearmiss(text, rel):
             base = base[:-2] if base.endswith("'s") else base
             base = base.rstrip("'")
             if len(base) >= MIN_LEN:
-                occurrences[base].append((ln, line))
+                occurrences[base].append((ln, line, m.start(), m.start() + len(base)))
     out = []
     for base, occ in sorted(occurrences.items()):
         closest = _match_token(base)
         if closest is None:
             continue
-        locations = [dict(path=rel, line=ln, snippet=line.strip()[:90])
-                     for ln, line in occ[:5]]
+        locations = [dict(path=rel, line=ln, col=s,
+                          snippet=_centered_snippet(line, s, e))
+                     for ln, line, s, e in occ[:5]]
         out.append(dict(category="nearmiss", key=base, closest=closest,
                         count=len(occ), locations=locations))
     return out
@@ -236,8 +250,11 @@ def check_regression(text, rel):
             if len(h["locations"]) < 5:
                 ls = text.rfind("\n", 0, m.start()) + 1
                 le = text.find("\n", m.start())
-                snippet = text[ls:le if le != -1 else ls + 90].strip()[:90]
-                h["locations"].append(dict(path=rel, line=ln, snippet=snippet))
+                line = text[ls:le if le != -1 else len(text)]
+                col = m.start() - ls
+                h["locations"].append(dict(
+                    path=rel, line=ln, col=col,
+                    snippet=_centered_snippet(line, col, col + len(m.group(0)))))
         for key, h in by_match.items():
             flags.append(dict(category="regression", key=f"{idx}:{key}",
                               rule=idx, find=rule.find, replace=rule.replace,
@@ -246,7 +263,7 @@ def check_regression(text, rel):
     return flags
 
 
-def lint_targets(path=None):
+def lint_targets(path=None, scope="all"):
     """Files to lint: raw drafts (nearmiss) and finished fan prose (both)."""
     if path:
         p = CORPUS / path
@@ -256,21 +273,25 @@ def lint_targets(path=None):
         if not p.is_file():
             raise FileNotFoundError(f"no such lint target: {path}")
         return [path]
-    targets = [p.relative_to(CORPUS).as_posix()
-               for p in sorted(CORPUS.glob("raw/*")) if p.suffix in (".md", ".txt")]
-    targets += [p.relative_to(CORPUS).as_posix()
-                for p in sorted(CORPUS.glob("worldend2/repo/Volumes/Volume_*/Text/*.md"))]
+    targets = []
+    if scope in ("all", "raw"):
+        targets += [p.relative_to(CORPUS).as_posix()
+                    for p in sorted(CORPUS.glob("raw/*")) if p.suffix in (".md", ".txt")]
+    if scope in ("all", "finished"):
+        targets += [p.relative_to(CORPUS).as_posix()
+                    for p in sorted(CORPUS.glob("worldend2/repo/Volumes/Volume_*/Text/*.md"))]
     return targets
 
 
-def lint(path=None, include_dismissed=False):
+def lint(path=None, include_dismissed=False, scope="all"):
+    from indexer import strip_binary_junk
     ensure_fresh()
     conn = connect()
     dismissed = _dismissed(conn)
     out = []
-    for rel in lint_targets(path):
+    for rel in lint_targets(path, scope):
         try:
-            text = (CORPUS / rel).read_text(encoding="utf-8")
+            text = strip_binary_junk((CORPUS / rel).read_text(encoding="utf-8"))
         except OSError:
             continue
         is_finished = rel.startswith("worldend2/repo/")
@@ -285,7 +306,7 @@ def lint(path=None, include_dismissed=False):
             flags = [f for f in flags if (f["category"], f["key"]) not in dismissed]
         if flags:
             out.append(dict(path=rel, flags=flags))
-    return dict(generated_at=time.time(), files=out,
+    return dict(generated_at=time.time(), scope=scope, files=out,
                 total=sum(len(f["flags"]) for f in out))
 
 
@@ -304,20 +325,26 @@ def undismiss(category, key):
     conn.commit()
 
 
-def cli_lint(path=None, verbose=False):
-    report = lint(path)
+def cli_lint(path=None, verbose=False, scope="all", triage=False):
+    report = lint(path, scope=scope)
+    if triage:
+        import triage as triage_mod
+        triage_mod.run_pending(report)
+        triage_mod.annotate(report)
     if not report["files"]:
         print("clean — no flags")
         return
     for f in report["files"]:
         print(f"== {f['path']}")
         for fl in f["flags"]:
+            ai = fl.get("ai")
+            ai_note = f"  [AI:{ai['verdict']} — {ai['reason']}]" if ai else ""
             if fl["category"] == "nearmiss":
-                print(f"  nearmiss  {fl['key']!r} ~ {fl['closest']!r}  ×{fl['count']}")
+                print(f"  nearmiss  {fl['key']!r} ~ {fl['closest']!r}  ×{fl['count']}{ai_note}")
             else:
                 man = " [manual-rule]" if fl.get("manual") else ""
                 print(f"  regression rule{fl['rule']} {fl['find']!r}->{fl['replace']!r}"
-                      f" matched {fl['matched']!r} ×{fl['count']}{man}")
+                      f" matched {fl['matched']!r} ×{fl['count']}{man}{ai_note}")
             if verbose:
                 for loc in fl["locations"]:
                     print(f"      {loc['path']}:{loc['line']}: {loc['snippet']}")
