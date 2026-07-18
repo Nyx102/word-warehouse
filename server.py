@@ -285,6 +285,17 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(markdown=p.read_text(encoding="utf-8")
                         if p.is_file() else "no coverage report yet"))
 
+    def h_help(self):
+        """Usage guide = the README's workflow section (single source of truth)."""
+        from config import ROOT
+        p = ROOT / "README.md"
+        text = p.read_text(encoding="utf-8") if p.is_file() else "no README"
+        start = text.find("## How you actually use it")
+        if start != -1:
+            end = text.find("\n## ", start + 10)
+            text = text[start:end] if end != -1 else text[start:]
+        self._json(dict(markdown=text))
+
     def h_lint(self):
         import triage
         scope = self._q("scope", "all")
@@ -405,6 +416,7 @@ ROUTES = [
     R(r"/api/align", {"GET"}, Handler.h_align),
     R(r"/api/file", {"GET"}, Handler.h_file),
     R(r"/api/coverage", {"GET"}, Handler.h_coverage),
+    R(r"/api/help", {"GET"}, Handler.h_help),
     R(r"/api/lint", {"GET"}, Handler.h_lint),
     R(r"/api/lint/dismiss", {"POST"}, Handler.h_lint_dismiss),
     R(r"/api/lint/undismiss", {"POST"}, Handler.h_lint_undismiss),

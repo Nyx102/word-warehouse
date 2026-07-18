@@ -948,3 +948,20 @@ mark {
   .modal { width: 100%; max-height: 92dvh; border-radius: 14px 14px 0 0; }
   .modal-foot { padding-bottom: calc(10px + var(--sab)); }
 }
+
+/* Help button */
+.help-btn {
+  border: 1px solid var(--border, #444);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+}
+.help-btn:hover { opacity: 1; }

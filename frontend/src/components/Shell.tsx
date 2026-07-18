@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { fmtAge } from '../util';
+import { HelpModal } from './HelpModal';
 import type { RepoName, StatusInfo, TabName } from '../types';
 
 const TABS: { id: TabName; label: string }[] = [
@@ -22,6 +23,7 @@ export function Shell({ tab, onTab, status, busy, onJumpRepo, sidebar, children 
   children: ReactNode;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const idx = status?.index;
   const dirtyCorpus = status?.git?.corpus?.dirty ?? 0;
   const dirtyRepo = status?.git?.repo?.dirty ?? 0;
@@ -35,7 +37,7 @@ export function Shell({ tab, onTab, status, busy, onJumpRepo, sidebar, children 
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="brand">WorldEnd</span>
+        <span className="brand">Word Warehouse</span>
         <nav className="tabs">
           {TABS.map((t) => (
             <button
@@ -63,6 +65,8 @@ export function Shell({ tab, onTab, status, busy, onJumpRepo, sidebar, children 
               repo {dirtyRepo}
             </button>
           )}
+          <button className="st-item help-btn" title="Help" aria-label="Help"
+            onClick={() => setHelpOpen(true)}>?</button>
         </div>
         <button
           className={'status-dot-btn' + (busy ? ' busy' : anyDirty ? ' dirty' : '')}
@@ -118,10 +122,17 @@ export function Shell({ tab, onTab, status, busy, onJumpRepo, sidebar, children 
               <span>Chat</span>
               <span>{busy ? <span className="busy-note"><span className="spinner" /> turn running</span> : 'idle'}</span>
             </div>
+            <button className="sheet-row linkish"
+              onClick={() => { setSheetOpen(false); setHelpOpen(true); }}>
+              <span>Help</span>
+              <span>?</span>
+            </button>
             <button className="btn sheet-close" onClick={() => setSheetOpen(false)}>Close</button>
           </div>
         </div>
       )}
+
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }
