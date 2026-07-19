@@ -45,7 +45,7 @@ export function Rail({ busy, dirty, onOpenSheet }: {
 
   return (
     <nav className="rail" aria-label="Sections">
-      <span className="rail-brand" title="Word Warehouse">W</span>
+      <img className="rail-brand" src="/favicon-96x96.png" alt="Word Warehouse" title="Word Warehouse" />
       {SECTIONS.map((s) => (
         <button
           key={s.id}
