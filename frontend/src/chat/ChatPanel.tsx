@@ -48,9 +48,13 @@ export function ChatPanel({ threadsApi, onTurnActiveChange }: {
   };
 
   const selected = threadsApi.selected;
+  // A selected thread's model (null -> app default), else the draft model that
+  // the next thread will be created with.
+  const modelValue: ModelName = selected ? (selected.model || 'sonnet') : threadsApi.draftModel;
 
   const changeModel = (m: ModelName) => {
     if (selected) void threadsApi.setModel(selected.id, m).catch(() => {});
+    else threadsApi.setDraftModel(m);
   };
 
   return (
@@ -60,7 +64,7 @@ export function ChatPanel({ threadsApi, onTurnActiveChange }: {
           ☰ Threads
         </button>
         <span className="toolbar-spacer" />
-        <ModelPicker thread={selected} disabled={stream.turnActive} onChange={changeModel} />
+        <ModelPicker value={modelValue} disabled={stream.turnActive} onChange={changeModel} />
       </div>
       <MessageList
         key={String(threadsApi.selectedId ?? 'none')}

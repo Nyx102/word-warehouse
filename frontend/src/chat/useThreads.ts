@@ -11,6 +11,10 @@ export interface ThreadsApi {
   create: () => Promise<ThreadId>;
   remove: (id: ThreadId) => Promise<void>;
   setModel: (id: ThreadId, model: ModelName) => Promise<void>;
+  /** Model the next-created thread will use, chosen in the picker before any
+   * thread exists (there's nothing to PATCH yet). */
+  draftModel: ModelName;
+  setDraftModel: (model: ModelName) => void;
   setPinned: (id: ThreadId, pinned: boolean) => Promise<void>;
   setArchived: (id: ThreadId, archived: boolean) => Promise<void>;
   rename: (id: ThreadId, title: string) => Promise<void>;
@@ -28,10 +32,15 @@ export function useThreads(): ThreadsApi {
   // thread id -> title derived from its first user message (null = fetch in flight)
   const [titles, setTitles] = useState<Record<string, string | null>>({});
   const [selectedId, setSelectedId] = useState<ThreadId | null>(null);
+  // Model for the next thread; sonnet mirrors the backend's null-model default
+  const [draftModel, setDraftModel] = useState<ModelName>('sonnet');
   const titlesRef = useRef(titles);
   titlesRef.current = titles;
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
+  // Read inside the stable `create` callback without making it depend on drafts
+  const draftModelRef = useRef(draftModel);
+  draftModelRef.current = draftModel;
 
   const fetchMissingTitles = useCallback((list: Thread[]) => {
     for (const t of list) {
@@ -75,6 +84,14 @@ export function useThreads(): ThreadsApi {
 
   const create = useCallback(async (): Promise<ThreadId> => {
     const r = await api<{ id: ThreadId }>('/api/threads', { method: 'POST', body: {} });
+    // Apply the picker's draft model before anyone sends: the first turn reads
+    // the thread's model at run time, and a null model would silently become
+    // sonnet. Skip when it's already the default to avoid a needless PATCH.
+    const m = draftModelRef.current;
+    if (m && m !== 'sonnet') {
+      await api(`/api/threads/${r.id}`, { method: 'PATCH', body: { model: m } })
+        .catch(() => { /* non-fatal: falls back to sonnet */ });
+    }
     setSelectedId(r.id);
     await reload();
     setSelectedId(r.id);
@@ -128,6 +145,8 @@ export function useThreads(): ThreadsApi {
     create,
     remove,
     setModel,
+    draftModel,
+    setDraftModel,
     setPinned,
     setArchived,
     rename,
