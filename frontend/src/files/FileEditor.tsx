@@ -5,7 +5,7 @@ import { api, ApiError } from '../api';
 import { toast } from '../components/Toasts';
 import { useMediaQuery } from '../util';
 import { useSettings } from '../app/settings';
-import { applyKeymap, baseExtensions, languageForPath, wireVimModeIndicator } from '../editor/cm';
+import { applyKeymap, baseExtensions, flashLine, languageForPath, wireVimModeIndicator } from '../editor/cm';
 import { setCursorPos, type CursorPos } from '../editor/cursorStore';
 import { setVimMode } from '../editor/vimModeStore';
 import type { FileFull } from '../types';
@@ -164,16 +164,10 @@ export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyCh
     rewireVimMode(viewRef.current);
   }, [keymapMode, rewireVimMode]);
 
-  // Scroll to (and select) the requested line. Runs after the view is built
-  // and again whenever a new deep-link target lands on the same open file.
   useEffect(() => {
     const v = viewRef.current;
     if (!v || content == null || !gotoLine || gotoLine < 1 || gotoLine > v.state.doc.lines) return;
-    const line = v.state.doc.line(gotoLine);
-    v.dispatch({
-      selection: { anchor: line.from, head: line.to },
-      effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
-    });
+    flashLine(v, v.state.doc.line(gotoLine).from);
   }, [gotoLine, content]);
 
   return (
