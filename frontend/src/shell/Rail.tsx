@@ -69,7 +69,6 @@ export function Rail({ busy, dirty, onOpenSheet }: {
       >
         <option value="normal">N</option>
         <option value="vim">V</option>
-        <option value="emacs">E</option>
       </select>
       <button
         className={'status-dot-btn' + (busy ? ' busy' : dirty ? ' dirty' : '')}

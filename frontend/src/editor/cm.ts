@@ -17,13 +17,12 @@ import { css } from '@codemirror/lang-css';
 import { html } from '@codemirror/lang-html';
 import { yaml } from '@codemirror/lang-yaml';
 import { Vim, getCM, vim } from '@replit/codemirror-vim';
-import { EmacsHandler, emacs } from '@replit/codemirror-emacs';
 import { doomTheme } from './theme';
 import type { KeymapName } from '../app/settings';
 
-/* Both modal plugins process keys in a view-plugin keydown handler and their
- * command tables are module-level singletons, so per-editor save actions are
- * routed through this map (vim :w and emacs C-x C-s land here) */
+/* The vim modal plugin processes keys in a view-plugin keydown handler and
+ * its command table is a module-level singleton, so per-editor save actions
+ * are routed through this map (vim :w lands here) */
 const saveHooks = new WeakMap<EditorView, () => void>();
 
 let modalSaveWired = false;
@@ -33,9 +32,6 @@ function wireModalSave() {
   Vim.defineEx('write', 'w', (cm: { cm6: EditorView }) => {
     saveHooks.get(cm.cm6)?.();
   });
-  EmacsHandler.bindKey('C-x C-s', (view: EditorView) => {
-    saveHooks.get(view)?.();
-  });
 }
 
 const keymapCompartment = new Compartment();
@@ -43,15 +39,14 @@ const themeCompartment = new Compartment();
 
 function modalExt(mode: KeymapName): Extension {
   if (mode === 'vim') return vim();
-  if (mode === 'emacs') return emacs();
   return [];
 }
 
 const isMac = /Mac|iP(hone|[oa]d)/.test(navigator.platform);
 
-/* Mod-s must save even in emacs mode, whose plugin sees keydown ahead of every
+/* Mod-s must save even in vim mode, whose plugin sees keydown ahead of every
  * keymap (C-s there is search). A raw handler at the highest precedence is the
- * only slot that reliably wins in all three modes. */
+ * only slot that reliably wins in both modes. */
 function saveKeyExt(onSave: () => void): Extension {
   return Prec.highest(EditorView.domEventHandlers({
     keydown(e) {
@@ -67,9 +62,9 @@ function saveKeyExt(onSave: () => void): Extension {
 }
 
 /** Shared CodeMirror base extensions for the Diffs and Files editors. `onSave`
- * is bound to Mod-s (plus vim :w and emacs C-x C-s); `wrap` toggles line
- * wrapping (off = long lines scroll horizontally, the mobile-friendly default
- * for code); `keymap` picks the modal editing mode. */
+ * is bound to Mod-s (plus vim :w); `wrap` toggles line wrapping (off = long
+ * lines scroll horizontally, the mobile-friendly default for code); `keymap`
+ * picks the modal editing mode. */
 export function baseExtensions({ onSave, wrap, keymap: mode }: {
   onSave: () => void;
   wrap: boolean;

@@ -9,7 +9,7 @@ import { bufferModeLabel, repoForBuffer } from '../workspace/buffers';
 import { IconGit } from './icons';
 import type { StatusInfo } from '../types';
 
-const KEYMAP_LABEL: Record<string, string> = { normal: 'STD', vim: 'VIM', emacs: 'EMACS' };
+const KEYMAP_LABEL: Record<string, string> = { normal: 'STD', vim: 'VIM' };
 
 /** Global modeline: always mounted, one row, independent of buffer kind or
  * editor keymap. Shows what's open, where the cursor is, the relevant repo's

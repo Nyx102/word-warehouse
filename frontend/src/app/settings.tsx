@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 export type Theme = 'dark' | 'light';
-export type KeymapName = 'normal' | 'vim' | 'emacs';
+export type KeymapName = 'normal' | 'vim';
 
 interface Settings {
   theme: Theme;
@@ -22,7 +22,7 @@ function readStored(): Settings {
   } catch { /* Corrupted -> defaults */ }
   return {
     theme: raw.theme === 'light' ? 'light' : 'dark',
-    keymap: raw.keymap === 'vim' || raw.keymap === 'emacs' ? raw.keymap : 'normal',
+    keymap: raw.keymap === 'vim' ? raw.keymap : 'normal',
   };
 }
 

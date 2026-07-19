@@ -63,7 +63,6 @@ export function StatusSheet({ status, busy, onClose }: {
           >
             <option value="normal">Normal</option>
             <option value="vim">Vim</option>
-            <option value="emacs">Emacs</option>
           </select>
         </div>
         <button className="sheet-row linkish sheet-mobile"
