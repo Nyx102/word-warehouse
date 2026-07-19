@@ -18,6 +18,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pip install --no-cache-dir pyyaml \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Run as a non-root user whose uid/gid match the host caller. docker-compose
+# passes these as build args (sourced from .env); the container then writes to
+# the bind-mounted project as the host user instead of root, so nothing lands
+# root-owned. The 1000 defaults are only a fallback for a build without .env.
+ARG PUID=1000
+ARG PGID=1000
+RUN groupadd -g "$PGID" dev \
+    && useradd -m -u "$PUID" -g "$PGID" -s /bin/bash dev
+ENV HOME=/home/dev
+
 # fixed container-internal path; docker-compose bind-mounts the live project
 # here — nothing about the host's layout is assumed
 COPY . /word-warehouse
@@ -26,6 +36,7 @@ RUN ln -sf /word-warehouse/corpus_cli.py /usr/local/bin/corpus \
     && chmod +x /word-warehouse/corpus_cli.py \
     && git config --system --add safe.directory '*'
 
+USER dev
 WORKDIR /word-warehouse
 EXPOSE 8686
 CMD ["python3", "server.py", "--host", "0.0.0.0", "--port", "8686"]

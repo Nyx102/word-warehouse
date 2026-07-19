@@ -1,15 +1,23 @@
 services:
   workbench:
-    build: .
+    build:
+      context: .
+      args:
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
     container_name: word-warehouse
     restart: unless-stopped
+    # Run as the host user (ids from .env) so bind-mounted files aren't
+    # root-owned. This also governs `docker compose exec`, so in-container npm
+    # builds and the embedded assistant's edits produce host-owned output too.
+    user: "${PUID:-1000}:${PGID:-1000}"
     ports:
       - "8686:8686"
       - "5173:5173"
     volumes:
       - .:/word-warehouse
-      - ~/.claude:/root/.claude
-      - ~/.gitconfig:/root/.gitconfig:ro
+      - ~/.claude:/home/dev/.claude
+      - ~/.gitconfig:/home/dev/.gitconfig:ro
     mem_limit: 3g
     environment:
       - WORKBENCH_CLAUDE_BIN=claude
