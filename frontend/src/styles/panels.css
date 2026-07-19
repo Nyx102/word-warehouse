@@ -199,10 +199,23 @@
 }
 .tree-row:hover { background: var(--accent-dim); }
 .tree-row.selected { background: var(--accent-dim); outline: 1px solid var(--accent); }
-.tree-caret { width: 12px; flex: none; color: var(--fg-dim); font-size: 10px; text-align: center; }
+.tree-caret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex: none;
+  color: var(--fg-dim);
+}
+.tree-caret svg { width: 14px; height: 14px; transition: transform 0.12s ease; }
+.tree-caret.open svg { transform: rotate(90deg); }
+.tree-icon { display: flex; align-items: center; justify-content: center; width: 15px; flex: none; color: var(--fg-dim); }
+.tree-icon svg { width: 14px; height: 14px; }
+.tree-icon.is-dir { color: var(--accent); }
 .tree-name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
 .tree-name.is-dir { color: var(--accent); }
-.tree-msg { color: var(--fg-dim); font-size: 12px; }
+.tree-msg { color: var(--fg-dim); font-size: 12px; padding-left: 8px; }
+.tree-group { margin-left: 13px; padding-left: 9px; border-left: 1px solid var(--border); }
 .tree-kebab {
   margin-left: auto;
   flex: none;

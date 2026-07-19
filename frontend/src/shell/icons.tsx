@@ -80,3 +80,54 @@ export const IconDockRight = () => (
     <path d="M14 4v16" />
   </Svg>
 );
+
+export const IconFilePlus = () => (
+  <Svg>
+    <path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z" />
+    <path d="M13.5 3v5.5H19" />
+    <path d="M12 12v6M9 15h6" />
+  </Svg>
+);
+
+export const IconFolderPlus = () => (
+  <Svg>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <path d="M12 11v6M9 14h6" />
+  </Svg>
+);
+
+export const IconUpload = () => (
+  <Svg>
+    <path d="M12 16V4" />
+    <path d="M7 9l5-5 5 5" />
+    <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+  </Svg>
+);
+
+export const IconChevronRight = () => (
+  <Svg>
+    <path d="M9 5l7 7-7 7" />
+  </Svg>
+);
+
+export const IconFolder = () => (
+  <Svg>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </Svg>
+);
+
+export const IconFile = () => (
+  <Svg>
+    <path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z" />
+    <path d="M13.5 3v5.5H19" />
+  </Svg>
+);
+
+export const IconRefresh = () => (
+  <Svg>
+    <path d="M3 11a9 9 0 0 1 15.3-5.7L21 8" />
+    <path d="M21 4v4h-4" />
+    <path d="M21 13a9 9 0 0 1-15.3 5.7L3 16" />
+    <path d="M3 20v-4h4" />
+  </Svg>
+);

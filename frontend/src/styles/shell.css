@@ -106,11 +106,12 @@
 .fs-side { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .fs-tools {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 10px;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
   flex: none;
 }
+.fs-tool-btn svg { width: 16px; height: 16px; display: block; }
 .fs-ctx {
   padding: 0 12px 6px;
   font-size: 11px;

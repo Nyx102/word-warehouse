@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { IconChevronRight, IconFile, IconFolder } from '../shell/icons';
 import type { DirEntry } from '../types';
 
 interface NodeState { entries: DirEntry[]; loading: boolean; error?: boolean; }
@@ -45,24 +46,28 @@ export function FileTree({ selected, onSelect, onMenu, refreshKey }: {
     });
   }, [dirs, loadDir]);
 
-  const renderDir = (path: string, depth: number): ReactNode => {
+  const renderDir = (path: string): ReactNode => {
     const node = dirs[path];
     if (!node) return null;
-    if (node.error) return <div className="tree-msg" style={{ paddingLeft: 8 + depth * 14 }}>failed to load</div>;
+    if (node.error) return <div className="tree-msg">failed to load</div>;
     return node.entries.map((e) => {
       const open = expanded.has(e.path);
       return (
         <div key={e.path}>
           <div
             className={'tree-row' + (selected === e.path ? ' selected' : '')}
-            style={{ paddingLeft: 6 + depth * 14 }}
             onClick={() => { if (e.is_dir) toggle(e.path); onSelect(e); }}
             onContextMenu={onMenu
               ? (ev) => { ev.preventDefault(); onMenu(e, ev.clientX, ev.clientY); }
               : undefined}
             title={e.path}
           >
-            <span className="tree-caret">{e.is_dir ? (open ? '▾' : '▸') : ''}</span>
+            <span className={'tree-caret' + (open ? ' open' : '')}>
+              {e.is_dir && <IconChevronRight />}
+            </span>
+            <span className={'tree-icon' + (e.is_dir ? ' is-dir' : '')}>
+              {e.is_dir ? <IconFolder /> : <IconFile />}
+            </span>
             <span className={'tree-name mono' + (e.is_dir ? ' is-dir' : '')}>{e.name}</span>
             {onMenu && (
               <button
@@ -77,7 +82,9 @@ export function FileTree({ selected, onSelect, onMenu, refreshKey }: {
               >⋯</button>
             )}
           </div>
-          {e.is_dir && open && renderDir(e.path, depth + 1)}
+          {e.is_dir && open && (
+            <div className="tree-group">{renderDir(e.path)}</div>
+          )}
         </div>
       );
     });
@@ -88,7 +95,7 @@ export function FileTree({ selected, onSelect, onMenu, refreshKey }: {
     <div className="file-tree">
       {!root || (root.loading && !root.entries.length)
         ? <div className="empty">Loading…</div>
-        : renderDir('', 0)}
+        : renderDir('')}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { toast } from '../components/Toasts';
 import { Modal } from '../components/Modal';
 import { FileTree } from '../files/FileTree';
 import { useWorkspace } from '../app/workspace';
+import { IconFilePlus, IconFolderPlus, IconRefresh, IconUpload } from '../shell/icons';
 import type { DirEntry } from '../types';
 
 const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
@@ -110,10 +111,27 @@ export function FilesSidebar() {
   return (
     <div className="fs-side">
       <div className="fs-tools">
-        <button className="btn btn-sm" onClick={() => { setDval(''); setDialog({ kind: 'newfile' }); }}>New</button>
-        <button className="btn btn-sm" onClick={() => { setDval(''); setDialog({ kind: 'newfolder' }); }}>Folder</button>
-        <button className="btn btn-sm" onClick={() => fileInputRef.current?.click()}>Upload</button>
-        <button className="btn btn-sm" onClick={bump} title="Refresh tree">↻</button>
+        <button
+          className="icon-btn fs-tool-btn"
+          title="New file" aria-label="New file"
+          onClick={() => { setDval(''); setDialog({ kind: 'newfile' }); }}
+        ><IconFilePlus /></button>
+        <button
+          className="icon-btn fs-tool-btn"
+          title="New folder" aria-label="New folder"
+          onClick={() => { setDval(''); setDialog({ kind: 'newfolder' }); }}
+        ><IconFolderPlus /></button>
+        <button
+          className="icon-btn fs-tool-btn"
+          title="Upload" aria-label="Upload"
+          onClick={() => fileInputRef.current?.click()}
+        ><IconUpload /></button>
+        <span className="toolbar-spacer" />
+        <button
+          className="icon-btn fs-tool-btn"
+          title="Refresh tree" aria-label="Refresh tree"
+          onClick={bump}
+        ><IconRefresh /></button>
         <input
           ref={fileInputRef} type="file" multiple hidden
           onChange={(e) => { if (e.target.files?.length) void onUpload(e.target.files); e.target.value = ''; }}
