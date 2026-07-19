@@ -22,9 +22,6 @@ export function AiDismissedSection({ cleared, onRestore, busyKeys }: {
           <div className="flag ai-cleared" key={flagIdent(flag)}>
             <div className="flag-head">
               <span className="chip chip-clear">{flag.category}</span>
-              <span className="flag-title">
-                <b>{flag.key}</b> <span className="dim mono">{filePath}</span>
-              </span>
               <button
                 className="btn btn-sm"
                 disabled={busyKeys.has(flagIdent(flag))}
@@ -32,6 +29,9 @@ export function AiDismissedSection({ cleared, onRestore, busyKeys }: {
                 onClick={() => onRestore(flag)}
               >Restore</button>
             </div>
+            <span className="flag-title">
+              <b>{flag.key}</b> <span className="dim mono">{filePath}</span>
+            </span>
             <div className="ai-note">
               AI: clear—{flag.ai?.reason || '(no reason given)'}
               {flag.ai?.judged_at ? <span className="dim"> · judged {flag.ai.judged_at}</span> : null}

@@ -67,11 +67,11 @@ export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen }: {
     <div className={'flag' + (dismissed ? ' dismissed' : '')}>
       <div className="flag-head">
         <span className={chipClass}>{flag.manual ? 'manual ' + flag.category : flag.category}</span>
-        {title}
         <button className="btn btn-sm flag-btn" onClick={onToggleDismiss}>
           {dismissed ? 'Undismiss' : 'Dismiss'}
         </button>
       </div>
+      {title}
       {flag.ai?.verdict === 'keep' && (
         <div className="ai-note">AI: keep—{flag.ai.reason}</div>
       )}
