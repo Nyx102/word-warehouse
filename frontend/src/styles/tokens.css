@@ -1,0 +1,170 @@
+/* Doom-one palettes (github.com/doomemacs/themes) in three tiers: semantic,
+ * syntax, vc. Every color literal in the app lives in this file; everything
+ * else references tokens. Aliased tokens (var(--blue) etc.) resolve against
+ * the active palette, so only literals and flipped faces repeat in the light
+ * block. */
+
+:root {
+  color-scheme: dark;
+
+  /* Palette: doom-one */
+  --base0: #1b2229;
+  --base1: #1c1f24;
+  --base2: #202328;
+  --base3: #23272e;
+  --base4: #3f444a;
+  --base5: #5b6268;
+  --base6: #73797e;
+  --base7: #9ca0a4;
+  --base8: #dfdfdf;
+  --red: #ff6c6b;
+  --orange: #da8548;
+  --green: #98be65;
+  --teal: #4db5bd;
+  --yellow: #ecbe7b;
+  --blue: #51afef;
+  --dark-blue: #2257a0;
+  --magenta: #c678dd;
+  --violet: #a9a1e1;
+  --cyan: #46d9ff;
+  --dark-cyan: #5699af;
+
+  /* Semantic */
+  --bg: #282c34;
+  --bg-alt: #21242b;
+  --panel: #1c1f24;
+  --raise: #23272e;
+  --border: #3f444a;
+  --fg: #bbc2cf;
+  --fg-dim: #9ca0a4;
+  --accent: var(--blue);
+  --accent-dim: rgba(81, 175, 239, 0.15);
+  --selection: var(--dark-blue);
+  --ok: var(--green);
+  --warn: var(--yellow);
+  --err: var(--red);
+  --on-accent: #1b2229;
+  --mark-bg: rgba(236, 190, 123, 0.30);
+  --backdrop: rgba(27, 34, 41, 0.60);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --stripe: rgba(255, 255, 255, 0.10);
+  --ctl-h: 32px;
+  --sans: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --sab: env(safe-area-inset-bottom, 0px);
+  --bottom-nav-h: 52px;
+
+  /* Tints: badge/chip fills and washes */
+  --tint-blue-bg: rgba(81, 175, 239, 0.15);
+  --tint-blue-border: rgba(81, 175, 239, 0.45);
+  --tint-green-bg: rgba(152, 190, 101, 0.15);
+  --tint-green-border: rgba(152, 190, 101, 0.45);
+  --tint-red-bg: rgba(255, 108, 107, 0.14);
+  --tint-red-border: rgba(255, 108, 107, 0.45);
+  --tint-yellow-bg: rgba(236, 190, 123, 0.15);
+  --tint-yellow-border: rgba(236, 190, 123, 0.45);
+  --tint-gray-bg: rgba(115, 121, 126, 0.16);
+  --tint-gray-border: rgba(115, 121, 126, 0.50);
+  --tint-violet-bg: rgba(169, 161, 225, 0.15);
+  --tint-violet-border: rgba(169, 161, 225, 0.45);
+  --tint-teal-bg: rgba(77, 181, 189, 0.14);
+  --tint-teal-border: rgba(77, 181, 189, 0.45);
+
+  /* Syntax: doom-one faces */
+  --syn-keyword: var(--blue);
+  --syn-operator: var(--blue);
+  --syn-func: var(--magenta);
+  --syn-builtin: var(--magenta);
+  --syn-string: var(--green);
+  --syn-type: var(--yellow);
+  --syn-const: var(--violet);
+  --syn-number: var(--orange);
+  --syn-comment: var(--base5);
+  --syn-variable: #dcaeea;
+  --syn-property: #dcaeea;
+
+  /* Version control */
+  --vc-added: var(--green);
+  --vc-modified: var(--orange);
+  --vc-deleted: var(--red);
+  --vc-added-bg: rgba(152, 190, 101, 0.12);
+  --vc-modified-bg: rgba(218, 133, 72, 0.12);
+  --vc-deleted-bg: rgba(255, 108, 107, 0.12);
+  --vc-added-hl: rgba(152, 190, 101, 0.30);
+  --vc-deleted-hl: rgba(255, 108, 107, 0.30);
+
+  /* Editor chrome */
+  --cm-active-line: rgba(81, 175, 239, 0.08);
+  --cm-active-gutter: rgba(81, 175, 239, 0.12);
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+
+  /* Palette: doom-one-light */
+  --base0: #f0f0f0;
+  --base1: #e7e7e7;
+  --base2: #dfdfdf;
+  --base3: #c6c7c7;
+  --base4: #9ca0a4;
+  --base5: #383a42;
+  --base6: #202328;
+  --base7: #1c1f24;
+  --base8: #1b2229;
+  --red: #e45649;
+  --orange: #da8548;
+  --green: #50a14f;
+  --teal: #4db5bd;
+  --yellow: #986801;
+  --blue: #4078f2;
+  --dark-blue: #a0bcf8;
+  --magenta: #a626a4;
+  --violet: #b751b6;
+  --cyan: #0184bc;
+  --dark-cyan: #005478;
+
+  /* Semantic */
+  --bg: #fafafa;
+  --bg-alt: #f0f0f0;
+  --panel: #ffffff;
+  --raise: #f0f0f0;
+  --border: #dfdfdf;
+  --fg: #383a42;
+  --fg-dim: #9ca0a4;
+  --accent-dim: rgba(64, 120, 242, 0.10);
+  --on-accent: #ffffff;
+  --mark-bg: rgba(236, 190, 123, 0.55);
+  --backdrop: rgba(56, 58, 66, 0.40);
+  --shadow: 0 8px 28px rgba(56, 58, 66, 0.18);
+  --stripe: rgba(0, 0, 0, 0.08);
+
+  --tint-blue-bg: rgba(64, 120, 242, 0.12);
+  --tint-blue-border: rgba(64, 120, 242, 0.40);
+  --tint-green-bg: rgba(80, 161, 79, 0.12);
+  --tint-green-border: rgba(80, 161, 79, 0.40);
+  --tint-red-bg: rgba(228, 86, 73, 0.10);
+  --tint-red-border: rgba(228, 86, 73, 0.40);
+  --tint-yellow-bg: rgba(152, 104, 1, 0.10);
+  --tint-yellow-border: rgba(152, 104, 1, 0.40);
+  --tint-gray-bg: rgba(156, 160, 164, 0.18);
+  --tint-gray-border: rgba(156, 160, 164, 0.60);
+  --tint-violet-bg: rgba(183, 81, 182, 0.10);
+  --tint-violet-border: rgba(183, 81, 182, 0.40);
+  --tint-teal-bg: rgba(77, 181, 189, 0.14);
+  --tint-teal-border: rgba(77, 181, 189, 0.45);
+
+  /* Syntax flips: keywords red, comments base4, variables darkened magenta */
+  --syn-keyword: var(--red);
+  --syn-comment: var(--base4);
+  --syn-variable: #6a1868;
+  --syn-property: #6a1868;
+
+  --vc-added-bg: rgba(80, 161, 79, 0.10);
+  --vc-modified-bg: rgba(218, 133, 72, 0.10);
+  --vc-deleted-bg: rgba(228, 86, 73, 0.10);
+  --vc-added-hl: rgba(80, 161, 79, 0.25);
+  --vc-deleted-hl: rgba(228, 86, 73, 0.25);
+
+  --cm-active-line: rgba(64, 120, 242, 0.06);
+  --cm-active-gutter: rgba(64, 120, 242, 0.10);
+}

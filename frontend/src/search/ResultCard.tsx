@@ -16,10 +16,13 @@ interface CtxChunk {
   hit: boolean;
 }
 
-export function ResultCard({ r, onOpenFile, onEdit }: {
+/** One search hit. Clicking the card opens the file at the matched line;
+ * "context" expands neighbor chunks inline, "view" pages the file in a modal.
+ * Paths passed out are corpus-relative; the caller maps them to buffers. */
+export function ResultCard({ r, onOpen, onView }: {
   r: SearchResult;
-  onOpenFile: (path: string, start: number) => void;
-  onEdit: (path: string, line: number) => void;
+  onOpen: (path: string, line: number) => void;
+  onView: (path: string, start: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [ctx, setCtx] = useState<CtxChunk[] | null>(null);
@@ -68,21 +71,28 @@ export function ResultCard({ r, onOpenFile, onEdit }: {
 
   return (
     <div className="result-card">
-      <div className="card-head" onClick={() => void toggle()}>
+      <div
+        className="card-head"
+        title="Open in editor"
+        onClick={() => onOpen(r.path, r.start_line || 1)}
+      >
         <div className="card-top">
           <span className={'badge badge-' + (r.source || 'unknown')}>{r.source || '?'}</span>
           {r.lang && <span className="lang-tag">{r.lang}</span>}
           <span className="card-meta">{meta.join(' · ')}</span>
         </div>
-        <div className="card-path mono">
-          {r.path}:{r.start_line}-{r.end_line}
-          <button
-            className="linkish card-edit"
-            title="Open in the Files editor"
-            onClick={(e) => { e.stopPropagation(); onEdit(r.path, r.start_line || 1); }}
-          >edit</button>
-        </div>
+        <div className="card-path mono">{r.path}:{r.start_line}-{r.end_line}</div>
         <div className="card-snippet" dangerouslySetInnerHTML={{ __html: markSnippet(r.snippet || '') }} />
+      </div>
+      <div className="card-actions">
+        <button className="linkish" onClick={() => void toggle()}>
+          {open ? 'hide context' : 'context'}
+        </button>
+        <button
+          className="linkish"
+          title="Page through the file"
+          onClick={() => onView(r.path, Math.max(1, (r.start_line || 1) - 40))}
+        >view</button>
       </div>
       {open && (
         <div className="card-expand">
@@ -94,15 +104,6 @@ export function ResultCard({ r, onOpenFile, onEdit }: {
               <div className="ctx-text">{it.text}</div>
             </div>
           ))}
-          {ctx && (
-            <button
-              className="linkish"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenFile(r.path, Math.max(1, (r.start_line || 1) - 40));
-              }}
-            >view more in {r.path}</button>
-          )}
         </div>
       )}
     </div>

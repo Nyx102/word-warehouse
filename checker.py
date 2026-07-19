@@ -7,12 +7,6 @@
 - regression: a replacement-rule `find` still matching finished prose. Exact:
   a match is only a regression if the rule would actually rewrite it there
   (sentence_aware / preserve_case / no-op cases are simulated, not guessed).
-  NOTE on semantics: the reference Scripts/regex_replace.py applies rules
-  SEQUENTIALLY (each on the previous rule's output); this checker applies each
-  rule independently to the on-disk text. Immaterial for finished prose: it is
-  supposed to be a fixed point of the whole pipeline, so any single rule that
-  would rewrite it is a true regression, and the earliest-diverging rule is
-  detected identically either way — only downstream cascade detail can differ.
 
 Dismissals are global per (category, key) — stable across edits and renames.
 """
@@ -24,10 +18,10 @@ from collections import defaultdict
 
 from config import CORPUS, RULES_YAML, SCRIPTS_DIR
 from db import connect
-from indexer import ensure_fresh
+from indexer import ensure_fresh, strip_binary_junk
 
 sys.path.insert(0, str(SCRIPTS_DIR))
-import regex_replace  # noqa: E402  (the fan repo's own engine — imported, not forked)
+import regex_replace  # noqa: E402  (the fan repo's own engine, imported not forked)
 
 WORD = re.compile(r"[A-Za-z][A-Za-z']{3,}")
 MIN_LEN = 4
@@ -240,7 +234,7 @@ def check_regression(text, rel):
         for m in pattern.finditer(text):
             try:
                 if repl(m) == m.group(0):
-                    continue  # rule is a no-op here (e.g. correct sentence case)
+                    continue  # Rule is a no-op here (e.g. correct sentence case)
             except re.error:
                 continue
             key = m.group(0)[:40]
@@ -284,7 +278,6 @@ def lint_targets(path=None, scope="all"):
 
 
 def lint(path=None, include_dismissed=False, scope="all"):
-    from indexer import strip_binary_junk
     ensure_fresh()
     conn = connect()
     dismissed = _dismissed(conn)
@@ -328,7 +321,7 @@ def undismiss(category, key):
 def cli_lint(path=None, verbose=False, scope="all", triage=False):
     report = lint(path, scope=scope)
     if triage:
-        import triage as triage_mod
+        import triage as triage_mod  # Lazy: only the --triage path needs AI wiring
         triage_mod.run_pending(report)
         triage_mod.annotate(report)
     if not report["files"]:

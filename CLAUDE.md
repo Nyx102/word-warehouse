@@ -18,7 +18,7 @@ path); the host location is irrelevant and may change.
 |---|---|
 | `server.py` etc. (root) | pure-stdlib Python backend; see README.md for the module table |
 | `corpus/` | ALL translation data (raws, official EN, the nested translation git repo at `corpus/worldend2/repo`, assistant notes) — part of this repo except the nested repo |
-| `frontend/` | React + Vite + TS + CodeMirror UI; build lands in `frontend/dist`, served by server.py |
+| `frontend/` | React + Vite + TS + CodeMirror IDE workspace (rail sections Files/Search/Git/Flags/Chat, buffer tabs, chat dock); styles split under `frontend/src/styles/`—color literals live ONLY in `tokens.css`; build lands in `frontend/dist`, served by server.py |
 | `data/` | runtime state (sqlite index, converted artifacts) — gitignored, disposable except chat threads |
 | `scripts/` | maintenance scripts; import `config` via sys.path bootstrap, never hardcode paths |
 
@@ -34,7 +34,7 @@ path); the host location is irrelevant and may change.
 One unified repo (code + corpus data). The translation repo `corpus/worldend2/repo`
 stays nested and ignored — it has its own GitHub remotes. Never `git commit` or
 `push` on the user's behalf unless asked; the embedded assistant's edits stay
-uncommitted for Diffs-tab review.
+uncommitted for review in the workspace's magit-style git UI.
 
 ## Cost rules
 

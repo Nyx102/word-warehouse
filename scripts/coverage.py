@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import CORPUS  # noqa: E402
 
 S1_VOLS = ["v01", "v02", "v03", "v04", "v05", "ex"]
-S2_TOTAL = 11  # series complete at #11 (Kadokawa Sneaker Bunko, 2021-07)
+S2_TOTAL = 11  # Series complete at #11 (Kadokawa Sneaker Bunko, 2021-07)
 
 
 def mark(path: Path) -> str:
@@ -30,7 +30,7 @@ def fan_status(vol: int) -> str:
     if not files:
         return "—"
     last = max(files, key=lambda s: [int(x) for x in s.split(".")])
-    # a lone final chapter file like 5.md marks a complete volume
+    # A lone final chapter file like 5.md marks a complete volume
     return "✓" if "." not in last and int(last) >= 5 else f"partial (through {last})"
 
 

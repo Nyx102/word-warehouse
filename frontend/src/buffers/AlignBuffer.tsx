@@ -20,9 +20,9 @@ interface VolBlock {
   cols: AlignCol[];
 }
 
-/** Chapter alignment matrix: volumes down the page, one column per
+/** Chapter alignment matrix buffer: volumes down the page, one column per
  * source/lang; rows sharing subtitle_key get the same pastel tint. */
-export function AlignPanel() {
+export function AlignBuffer() {
   const [series, setSeries] = useState('any');
   const [volume, setVolume] = useState('');
   const [rows, setRows] = useState<AlignRow[] | null>(null);
@@ -67,8 +67,7 @@ export function AlignPanel() {
   }
 
   return (
-    <details className="align-panel">
-      <summary>Alignment</summary>
+    <div className="align-buffer">
       <div className="align-controls">
         <select value={series} onChange={(e) => setSeries(e.target.value)} title="Series">
           <option value="any">series: any</option>
@@ -88,6 +87,9 @@ export function AlignPanel() {
       </div>
       <div className="align-results">
         {failed && <div className="empty">Failed to load alignment.</div>}
+        {!rows && !failed && !loading && (
+          <div className="empty">Pick a series or volume and load the alignment.</div>
+        )}
         {rows && rows.length === 0 && <div className="empty">No alignment rows.</div>}
         {volBlocks.map((vb) => (
           <div key={vb.vol}>
@@ -106,7 +108,7 @@ export function AlignPanel() {
                       const style = ch.subtitle_key
                         ? { background: `hsla(${hashHue(String(ch.subtitle_key))},60%,60%,0.16)` }
                         : undefined;
-                      const title = [ch.title, ch.subtitle].filter(Boolean).join(' — ')
+                      const title = [ch.title, ch.subtitle].filter(Boolean).join('—')
                         + (ch.part_title ? ' · ' + ch.part_title : '');
                       return (
                         <div
@@ -127,6 +129,6 @@ export function AlignPanel() {
           </div>
         ))}
       </div>
-    </details>
+    </div>
   );
 }

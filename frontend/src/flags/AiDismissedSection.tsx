@@ -33,7 +33,7 @@ export function AiDismissedSection({ cleared, onRestore, busyKeys }: {
               >Restore</button>
             </div>
             <div className="ai-note">
-              AI: clear — {flag.ai?.reason || '(no reason given)'}
+              AI: clear—{flag.ai?.reason || '(no reason given)'}
               {flag.ai?.judged_at ? <span className="dim"> · judged {flag.ai.judged_at}</span> : null}
             </div>
           </div>

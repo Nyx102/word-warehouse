@@ -11,13 +11,18 @@ export interface ThreadsApi {
   create: () => Promise<ThreadId>;
   remove: (id: ThreadId) => Promise<void>;
   setModel: (id: ThreadId, model: ModelName) => Promise<void>;
+  setPinned: (id: ThreadId, pinned: boolean) => Promise<void>;
+  setArchived: (id: ThreadId, archived: boolean) => Promise<void>;
+  rename: (id: ThreadId, title: string) => Promise<void>;
   setLocalTitle: (id: ThreadId, text: string) => void;
   reload: () => Promise<void>;
   label: (t: Thread) => string;
 }
 
-/** Owns the thread list + selection. Lives in App so the desktop sidebar,
- * the mobile drawer and the chat panel all share one copy. */
+/** Owns the thread list + selection. Lives in App so the sidebar, the chat
+ * drawer and the chat panel all share one copy. List order comes from the
+ * server (pinned first, then most recently active); archived threads are
+ * included but never auto-selected. */
 export function useThreads(): ThreadsApi {
   const [threads, setThreads] = useState<Thread[]>([]);
   // thread id -> title derived from its first user message (null = fetch in flight)
@@ -54,13 +59,13 @@ export function useThreads(): ThreadsApi {
 
   const reload = useCallback(async () => {
     const d = await api<{ threads: Thread[] }>('/api/threads');
-    const sorted = (d.threads || []).slice().sort((a, b) =>
-      String(b.last_active || b.created_at || '').localeCompare(String(a.last_active || a.created_at || '')));
-    setThreads(sorted);
-    fetchMissingTitles(sorted);
-    // keep selection valid; auto-select the most recent thread when none is
-    if (selectedRef.current == null || !sorted.some((t) => t.id === selectedRef.current)) {
-      setSelectedId(sorted.length ? sorted[0].id : null);
+    const list = d.threads || [];
+    setThreads(list);
+    fetchMissingTitles(list);
+    // Keep selection valid; auto-select skips archived threads
+    if (selectedRef.current == null || !list.some((t) => t.id === selectedRef.current)) {
+      const first = list.find((t) => !t.archived);
+      setSelectedId(first ? first.id : null);
     }
   }, [fetchMissingTitles]);
 
@@ -87,6 +92,21 @@ export function useThreads(): ThreadsApi {
     setThreads((ts) => ts.map((t) => (t.id === id ? { ...t, model } : t)));
   }, []);
 
+  // Pin/archive/rename change server-side ordering, so refetch after the PATCH
+  const patch = useCallback(async (id: ThreadId, body: Record<string, unknown>) => {
+    await api(`/api/threads/${id}`, { method: 'PATCH', body });
+    await reload();
+  }, [reload]);
+
+  const setPinned = useCallback((id: ThreadId, pinned: boolean) =>
+    patch(id, { pinned: pinned ? 1 : 0 }), [patch]);
+
+  const setArchived = useCallback((id: ThreadId, archived: boolean) =>
+    patch(id, { archived: archived ? 1 : 0 }), [patch]);
+
+  const rename = useCallback((id: ThreadId, title: string) =>
+    patch(id, { title }), [patch]);
+
   const setLocalTitle = useCallback((id: ThreadId, text: string) => {
     const k = String(id);
     if (titlesRef.current[k]) return; // already have one
@@ -95,7 +115,10 @@ export function useThreads(): ThreadsApi {
     setTitles((m) => ({ ...m, [k]: t }));
   }, []);
 
-  const label = useCallback((t: Thread) => t.title || titles[String(t.id)] || 'New thread', [titles]);
+  const label = useCallback(
+    (t: Thread) => t.title || titles[String(t.id)] || 'Thread #' + t.id,
+    [titles],
+  );
 
   return {
     threads,
@@ -105,46 +128,11 @@ export function useThreads(): ThreadsApi {
     create,
     remove,
     setModel,
+    setPinned,
+    setArchived,
+    rename,
     setLocalTitle,
     reload,
     label,
   };
-}
-
-export function ThreadList({ threadsApi, onAfterSelect }: {
-  threadsApi: ThreadsApi;
-  onAfterSelect?: () => void;
-}) {
-  return (
-    <div className="thread-pane">
-      <div className="thread-head">
-        <span className="pane-title">Threads</span>
-        <button
-          className="btn btn-sm"
-          title="New chat thread"
-          onClick={() => { void threadsApi.create().then(() => onAfterSelect?.()).catch(() => {}); }}
-        >+ New</button>
-      </div>
-      <ul className="thread-list">
-        {threadsApi.threads.map((t) => (
-          <li
-            key={String(t.id)}
-            className={'thread' + (t.id === threadsApi.selectedId ? ' active' : '')}
-            onClick={() => { threadsApi.select(t.id); onAfterSelect?.(); }}
-          >
-            <span className="thread-title" title={threadsApi.label(t)}>{threadsApi.label(t)}</span>
-            <button
-              className="thread-del"
-              title="Delete thread"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (window.confirm('Delete this thread?')) void threadsApi.remove(t.id).catch(() => {});
-              }}
-            >×</button>
-          </li>
-        ))}
-        {threadsApi.threads.length === 0 && <li className="empty">No threads yet.</li>}
-      </ul>
-    </div>
-  );
 }

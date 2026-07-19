@@ -1,0 +1,70 @@
+/* Editor frame (toolbar, conflict bar) and CodeMirror sizing + merge chrome.
+ * Editor colors live in src/editor/theme.ts on the same tokens. */
+
+.merge-editor { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+  flex-wrap: wrap;
+}
+.editor-path {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+.dirty-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex: none;
+}
+/* Mobile change-stepper: hop between diff hunks without scrolling to hunt */
+.chunk-nav { display: inline-flex; gap: 4px; flex: none; }
+.chunk-nav .btn { min-width: 40px; min-height: 34px; font-weight: 700; line-height: 1; }
+.conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--tint-red-bg);
+  border-bottom: 1px solid var(--err);
+  color: var(--err);
+  font-size: 13px;
+  flex: none;
+}
+
+.merge-host { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+.merge-host .cm-mergeView { height: 100%; }
+.merge-host > .cm-editor { height: 100%; }
+.cm-editor { font-size: 13px; }
+
+/* Merge chrome; .cm-editor prefix outranks the merge package's base theme */
+.cm-merge-revert button { color: var(--accent); }
+.cm-collapsedLines { background: var(--accent-dim); color: var(--accent); }
+.cm-editor .cm-changedLine, .cm-changedLine { background: var(--vc-added-bg); }
+.cm-editor .cm-changedText, .cm-changedText { background: var(--vc-added-hl); }
+.cm-editor .cm-deletedChunk { background: var(--vc-deleted-bg); }
+.cm-editor .cm-inlineChangedText { background: var(--vc-deleted-hl); }
+.cm-deletedText, .cm-deletedChunk del { background: var(--vc-deleted-hl); text-decoration: none; }
+
+/* Read-only unified diff fallback (>2MB files); rendering is git/DiffText */
+.fallback-diff { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.fallback-note {
+  padding: 8px 12px;
+  color: var(--warn);
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+@media (max-width: 767px) {
+  .editor-path { max-width: 100%; }
+}

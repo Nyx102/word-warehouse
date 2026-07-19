@@ -5,7 +5,6 @@ export type ThreadId = number | string;
 export type RepoName = 'corpus' | 'repo';
 export type ModelName = 'haiku' | 'sonnet' | 'opus' | 'default';
 export type LintScope = 'raw' | 'finished' | 'all';
-export type TabName = 'chat' | 'search' | 'flags' | 'diffs' | 'files';
 
 /* ---- files tab ---- */
 export interface DirEntry {
@@ -106,16 +105,77 @@ export interface GitFileResponse {
   content: string;
 }
 
+export interface GitBranchState {
+  head: string | null;
+  oid: string | null;
+  upstream: string | null;
+  ahead: number | null;
+  behind: number | null;
+}
+
 export interface GitStatusFile {
-  status: string;
   path: string;
+  orig_path: string | null; // rename/copy source, else null
+  index: string;            // one status char; '' when unchanged
+  worktree: string;         // one status char; '' when unchanged
+  untracked: boolean;
+  status: string;           // legacy porcelain-v1 code ('M', '??', ...)
+}
+
+export interface GitStatusResponse {
+  branch: GitBranchState;
+  files: GitStatusFile[];
 }
 
 export interface GitLogEntry {
-  hash: string;
-  date: string;
+  hash: string;   // short sha
+  oid: string;    // full sha
+  author: string;
+  date: string;   // iso-strict
   subject: string;
 }
+
+export interface GitLogResponse {
+  log: GitLogEntry[];
+  has_more: boolean;
+}
+
+export interface GitCommitMeta {
+  hash: string;   // full sha
+  short: string;
+  author: string;
+  email: string;
+  date: string;   // iso-strict
+  parents: string[];
+  subject: string;
+  body: string;
+}
+
+export interface GitDiffStat {
+  path: string;
+  added: number | null;   // null for binary files
+  deleted: number | null;
+}
+
+export interface GitCommitDetail {
+  meta: GitCommitMeta;
+  stat: GitDiffStat[];
+  patch: string;
+}
+
+export interface GitBranch {
+  name: string;
+  current: boolean;
+  short: string;  // short sha of the tip
+  subject: string;
+}
+
+export interface GitBranchesResponse {
+  current: string | null;
+  branches: GitBranch[];
+}
+
+export type GitDiffMode = 'head' | 'worktree' | 'staged';
 
 /* ---- lint / flags ---- */
 
@@ -168,8 +228,10 @@ export interface Thread {
   title: string | null;
   claude_session_id?: string | null;
   model: ModelName | null;
-  created_at: string;
-  last_active: string | null;
+  created_at: number;        // epoch seconds
+  last_active: number | null;
+  pinned: number;
+  archived: number;
 }
 
 export interface ThreadMessage {
@@ -178,7 +240,7 @@ export interface ThreadMessage {
   seq: number;
   kind: string;
   content: string; // JSON string, parses to ChatEventPayload
-  created_at: string;
+  created_at: number;
 }
 
 /* One SSE/replayed chat event. Kinds: user_text, init, text_delta,

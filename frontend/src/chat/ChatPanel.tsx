@@ -3,9 +3,13 @@ import { useChatStream } from '../hooks/useChatStream';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { ModelPicker } from './ModelPicker';
-import { ThreadList, type ThreadsApi } from './ThreadList';
+import { ThreadsSidebar } from '../sidebars/ThreadsSidebar';
+import type { ThreadsApi } from './useThreads';
 import type { ModelName } from '../types';
 
+/** Body of the chat dock: model picker header, message stream, composer.
+ * The thread title lives in the dock bar (ChatDock); below 1024px a drawer
+ * button opens the full thread manager inside the panel. */
 export function ChatPanel({ threadsApi, onTurnActiveChange }: {
   threadsApi: ThreadsApi;
   onTurnActiveChange: (on: boolean) => void;
@@ -55,9 +59,7 @@ export function ChatPanel({ threadsApi, onTurnActiveChange }: {
         <button className="btn btn-sm drawer-btn" onClick={() => setDrawerOpen(true)} title="Threads">
           ☰ Threads
         </button>
-        <span className="chat-title" title={selected ? threadsApi.label(selected) : ''}>
-          {selected ? threadsApi.label(selected) : 'No thread — send a message to start one'}
-        </span>
+        <span className="toolbar-spacer" />
         <ModelPicker thread={selected} disabled={stream.turnActive} onChange={changeModel} />
       </div>
       <MessageList
@@ -72,7 +74,7 @@ export function ChatPanel({ threadsApi, onTurnActiveChange }: {
           onClick={(e) => { if (e.target === e.currentTarget) setDrawerOpen(false); }}
         >
           <div className="drawer">
-            <ThreadList threadsApi={threadsApi} onAfterSelect={() => setDrawerOpen(false)} />
+            <ThreadsSidebar threadsApi={threadsApi} onAfterSelect={() => setDrawerOpen(false)} />
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@
 // Deliberately conservative: the API is never cached, navigations are
 // network-first (so a rebuilt bundle is never masked by a stale shell), and
 // only content-hashed /assets/ (immutable) are cached-first.
-const CACHE = 'ww-shell-v1';
+const CACHE = 'ww-shell-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {

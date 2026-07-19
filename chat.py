@@ -7,14 +7,13 @@ here — one CLI invocation per user message."""
 import json
 import os
 import queue
+import shutil
 import subprocess
 import threading
 import time
 
 from config import CORPUS, DATA
 from db import connect
-
-import shutil
 
 CLAUDE_BIN = (os.environ.get("WORKBENCH_CLAUDE_BIN")
               or shutil.which("claude")
@@ -116,7 +115,7 @@ def start_turn(thread_id, text):
         worker = threading.Thread(target=_run_turn, args=(turn, text), daemon=True)
         worker.start()
     except BaseException:
-        # never leave a registered turn with no worker to clean it up
+        # Never leave a registered turn with no worker to clean it up
         with _active_lock:
             _active.pop(thread_id, None)
         raise
@@ -129,7 +128,7 @@ def _emit(turn, conn, kind, **payload):
     try:
         _persist(conn, turn.thread_id, turn.turn_no, turn.seq, kind, payload)
     except Exception:
-        # persistence failure (db busy, thread deleted mid-turn) must not stop
+        # Persistence failure (db busy, thread deleted mid-turn) must not stop
         # the stream or the cleanup path; the row is merely absent from replay
         pass
     turn.publish(payload)
@@ -142,12 +141,12 @@ def _run_turn(turn, text):
         row = conn.execute("SELECT claude_session_id, model FROM threads WHERE id=?",
                            (turn.thread_id,)).fetchone()
         session_id = row["claude_session_id"] if row else None
-        # app default is sonnet — NEVER inherit the CLI default silently (the
+        # App default is sonnet. NEVER inherit the CLI default silently (the
         # user's interactive default may be an expensive tier); "default"
-        # explicitly opts back into the CLI default
+        # explicitly opts back into the CLI default.
         model = (row["model"] if row and row["model"] else "sonnet")
 
-        # permissions ride on explicit flags: headless mode does not honor a
+        # Permissions ride on explicit flags: headless mode does not honor a
         # project .claude/settings.json in a directory without interactive trust
         allowed = ["Read", "Edit", "Write", "Grep", "Glob", "WebSearch",
                    "WebFetch", "Bash(corpus:*)", "Bash(git status:*)",
@@ -233,7 +232,7 @@ def _pump(turn, conn):
 
         elif et == "stream_event":
             inner = ev.get("event") or {}
-            # ephemeral events get their own seq too: the client dedupes on
+            # Ephemeral events get their own seq too: the client dedupes on
             # (turn, seq), so sharing the previous event's seq would swallow
             # every streamed delta after the first
             if inner.get("type") == "content_block_delta":
@@ -284,7 +283,7 @@ def _pump(turn, conn):
                   session_id=sid)
 
     turn.proc.wait()
-    if turn.proc.returncode not in (0, None) :
+    if turn.proc.returncode not in (0, None):
         err = (turn.proc.stderr.read() or "")[:800]
         _emit(turn, conn, "error",
               message=f"claude exited {turn.proc.returncode}: {err}")
@@ -301,9 +300,39 @@ def interrupt(thread_id):
 # ------------------------------------------------------------------ threads
 
 def list_threads():
+    """All threads, archived included; the frontend sections them."""
     conn = connect()
     return [dict(r) for r in conn.execute(
-        "SELECT * FROM threads WHERE archived=0 ORDER BY last_active DESC")]
+        "SELECT * FROM threads ORDER BY pinned DESC, last_active DESC")]
+
+
+_MODELS = ("haiku", "sonnet", "opus", "default", None)
+
+
+def update_thread(thread_id, **fields):
+    """Apply any of title/model/pinned/archived; ValueError on bad input."""
+    sets, params = [], []
+    for key, value in fields.items():
+        if key == "model":
+            if value not in _MODELS:
+                raise ValueError("bad model")
+        elif key == "title":
+            if value is not None and not isinstance(value, str):
+                raise ValueError("bad title")
+        elif key in ("pinned", "archived"):
+            if not isinstance(value, (bool, int)) or value not in (0, 1):
+                raise ValueError(f"bad {key}")
+            value = int(value)
+        else:
+            raise ValueError(f"unknown field: {key}")
+        sets.append(f"{key}=?")
+        params.append(value)
+    if not sets:
+        return
+    conn = connect()
+    conn.execute(f"UPDATE threads SET {', '.join(sets)} WHERE id=?",
+                 (*params, thread_id))
+    conn.commit()
 
 
 def create_thread(title=None):

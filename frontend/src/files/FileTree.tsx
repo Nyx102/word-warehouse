@@ -5,10 +5,13 @@ import type { DirEntry } from '../types';
 interface NodeState { entries: DirEntry[]; loading: boolean; error?: boolean; }
 
 /** Lazy, per-directory file tree over /api/fs/list. Directories load their
- * children on first expand; `refreshKey` bumps re-list the root + open dirs. */
-export function FileTree({ selected, onSelect, refreshKey }: {
+ * children on first expand; `refreshKey` bumps re-list the root + open dirs.
+ * `onMenu` (kebab click or right-click) receives viewport coordinates for a
+ * caller-rendered context menu. */
+export function FileTree({ selected, onSelect, onMenu, refreshKey }: {
   selected: string | null;
   onSelect: (entry: DirEntry) => void;
+  onMenu?: (entry: DirEntry, x: number, y: number) => void;
   refreshKey: number;
 }) {
   const [dirs, setDirs] = useState<Record<string, NodeState>>({});
@@ -27,7 +30,7 @@ export function FileTree({ selected, onSelect, refreshKey }: {
     }
   }, []);
 
-  // (Re)load the root and any currently-expanded dirs when refreshKey changes.
+  // (Re)load the root and any currently-expanded dirs when refreshKey changes
   useEffect(() => {
     void loadDir('');
     expandedRef.current.forEach((p) => void loadDir(p));
@@ -54,10 +57,25 @@ export function FileTree({ selected, onSelect, refreshKey }: {
             className={'tree-row' + (selected === e.path ? ' selected' : '')}
             style={{ paddingLeft: 6 + depth * 14 }}
             onClick={() => { if (e.is_dir) toggle(e.path); onSelect(e); }}
+            onContextMenu={onMenu
+              ? (ev) => { ev.preventDefault(); onMenu(e, ev.clientX, ev.clientY); }
+              : undefined}
             title={e.path}
           >
             <span className="tree-caret">{e.is_dir ? (open ? '▾' : '▸') : ''}</span>
             <span className={'tree-name mono' + (e.is_dir ? ' is-dir' : '')}>{e.name}</span>
+            {onMenu && (
+              <button
+                className="tree-kebab"
+                title="Actions"
+                aria-label={'Actions for ' + e.name}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  const r = ev.currentTarget.getBoundingClientRect();
+                  onMenu(e, r.left, r.bottom);
+                }}
+              >⋯</button>
+            )}
           </div>
           {e.is_dir && open && renderDir(e.path, depth + 1)}
         </div>

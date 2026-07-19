@@ -36,7 +36,7 @@ ILLUST = re.compile(r"^插图$|^插圖$")
 MD_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 SCENE_MD = re.compile(r"^\s*\*\s*\*\s*\*\s*$")
 RUBY = re.compile(r"(?<=[一-鿿])[ぁ-ゖ]{1,3}(?=[一-鿿])")
-# hiragana runs between kanji that are (or end with) these are grammar, not ruby:
+# Hiragana runs between kanji that are (or end with) these are grammar, not ruby:
 # stripping them fabricates compounds (人の形 -> 人形) and poisons search
 PARTICLES = ("の", "が", "を", "に", "で", "と", "は", "も", "や", "へ")
 
@@ -87,10 +87,10 @@ def subtitle_key(s: str):
 def _ruby_repl(m):
     run = m.group(0)
     if run in PARTICLES or (len(run) == 2 and run in ("から", "まで", "より")):
-        return run  # pure particle — keep
+        return run  # Pure particle, keep
     for p in PARTICLES:
         if len(run) > 1 and run.endswith(p):
-            return p  # ruby reading followed by a particle: 鍋なべの中 -> 鍋の中
+            return p  # Ruby reading followed by a particle: 鍋なべの中 -> 鍋の中
     return ""
 
 
@@ -161,7 +161,7 @@ def _toc_entries(lines, limit=800):
                     title = m.group(1) if m else prev
                     break
             raw.append((i, title, subtitle))
-    # the TOC block is contiguous; a big gap means we've hit body headings proper
+    # The TOC block is contiguous; a big gap means we've hit body headings proper
     kept = []
     for e in raw:
         if kept and e[0] - kept[-1][0] > 60:
@@ -176,7 +176,7 @@ def _toc_entries(lines, limit=800):
             seen[k] = len(entries)
             entries.append((idx, title, subtitle))
     if len(entries) < 2:
-        # a one-entry "TOC" is a stray body heading, not a contents block
+        # A one-entry "TOC" is a stray body heading, not a contents block
         # (real TOC-less files would otherwise get a phantom chapter and their
         # opening prose mislabeled as frontmatter)
         return [], {}
@@ -232,7 +232,6 @@ def segment_txt(text, lang):
     """-> (chapters, chunks). Chapter dicts: ord, title, subtitle, start_line(1b)|None."""
     lines = text.splitlines()
 
-    # style 1: explicit 第N卷 markers (split-omnibus files)
     markers = [(i, VOL_MARKER.match(l).group(1))
                for i, l in enumerate(lines) if VOL_MARKER.match(l)]
     chapters = []
@@ -252,7 +251,7 @@ def segment_txt(text, lang):
                 chapters.append(dict(ord=ord_, title=title, subtitle=subtitle,
                                      start_line=(pos + 1) if pos is not None else None))
         else:
-            # volume granularity: keep TOC titles as metadata without ranges
+            # Volume granularity: keep TOC titles as metadata without ranges
             for ord_, (_, title, subtitle) in enumerate(entries):
                 chapters.append(dict(ord=ord_, title=title, subtitle=subtitle,
                                      start_line=None))
@@ -264,7 +263,7 @@ def segment_txt(text, lang):
             boundaries.add(idx)
     chunks = _chunk(units, boundaries)
 
-    # reading order = located position, not TOC listing order (some rips scramble it)
+    # Reading order = located position, not TOC listing order (some rips scramble it)
     chapters.sort(key=lambda c: (c["start_line"] is None, c["start_line"] or 0))
     for ord_, c in enumerate(chapters):
         c["ord"] = ord_

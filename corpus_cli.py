@@ -6,13 +6,17 @@ refreshes the index first (pure-local stat scan; no AI involved, costs nothing).
 """
 
 import argparse
+import re
 import sys
+import time
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent
 sys.path.insert(0, str(APP))
 
 from config import CORPUS, RULES_YAML, SCRIPTS_DIR  # noqa: E402
+
+# Subcommands import their heavy deps lazily so argparse and --help stay instant
 
 
 def _print_hit(r):
@@ -133,9 +137,8 @@ def cmd_sniff(args):
         series = 2
     elif any(s in text[:3000] for s in ("救ってもらっていい", "可以来拯救", "可以來拯救", "WorldEnd")):
         series = 1
-    import re as _re
-    m = _re.search(r"(?:#|＃|vol\.?\s*|volume\s*)0*(\d+)", head, _re.I) or \
-        _re.search(r"0*(\d+)", p.name)
+    m = re.search(r"(?:#|＃|vol\.?\s*|volume\s*)0*(\d+)", head, re.I) or \
+        re.search(r"0*(\d+)", p.name)
     vol = m.group(1).zfill(2) if m else None
     ex = "EX" in head.upper() or "ＥＸ" in head
     print(f"file:   {p}")
@@ -152,7 +155,6 @@ def cmd_sniff(args):
 def cmd_status(args):
     from db import connect
     from indexer import ensure_fresh
-    import time
     conn = connect()
     n = ensure_fresh(conn)
     print(f"reindexed just now: {n} file(s)")

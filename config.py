@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-APP = ROOT  # legacy alias
 CORPUS = Path(os.environ.get("WORKBENCH_CORPUS", str(ROOT / "corpus")))
 DATA = Path(os.environ.get("WORKBENCH_DATA", str(ROOT / "data")))
 DB_PATH = DATA / "corpus.db"
@@ -21,11 +20,11 @@ REPO = CORPUS / "worldend2/repo"
 RULES_YAML = REPO / "Volumes/replacements.yaml"
 SCRIPTS_DIR = REPO / "Scripts"
 
-# bare-host default is loopback; the container CMD passes --host 0.0.0.0
+# Bare-host default is loopback; the container CMD passes --host 0.0.0.0
 HOST = os.environ.get("WORKBENCH_HOST", "127.0.0.1")
 PORT = int(os.environ.get("WORKBENCH_PORT", "8686"))
 
-# glob patterns (relative to CORPUS) that make up the index, and nothing else
+# Glob patterns (relative to CORPUS) that make up the index, and nothing else
 INCLUDE_GLOBS = [
     "worldend/official-en/*.txt",
     "worldend/jp/*.txt",
@@ -63,7 +62,7 @@ def classify(rel: str):
 
     if rel.startswith("worldend/official-en/"):
         return dict(source="official", lang="en", series=1, volume=vol(), chapter_label=None)
-    # lang=None -> indexer sniffs the content (zh dirs mix simplified/traditional rips)
+    # Lang=None -> indexer sniffs the content (zh dirs mix simplified/traditional rips)
     if rel.startswith("worldend/jp/"):
         return dict(source="jp", lang=None, series=1, volume=vol(), chapter_label=None)
     if rel.startswith("worldend/zh/"):

@@ -18,7 +18,7 @@ from config import CORPUS, ROOT  # noqa: E402
 
 OUT = ROOT / "trad2simp.py"
 
-# high-confidence manual seed (common chars; also covers pairs the harvest may miss)
+# High-confidence manual seed (common chars; also covers pairs the harvest may miss)
 SEED = {
     "來": "来", "沒": "没", "時": "时", "說": "说", "話": "话", "語": "语", "讀": "读",
     "寫": "写", "萬": "万", "與": "与", "體": "体", "見": "见", "現": "现", "麼": "么",
@@ -90,7 +90,7 @@ def main():
     aligned = 0
     for t in trad_lines:
         cands = by_skel.get(skeleton(t), [])
-        # unique skeleton match = reliable alignment
+        # Unique skeleton match = reliable alignment
         if len(cands) != 1:
             continue
         s = cands[0]
@@ -101,7 +101,7 @@ def main():
         for tc, sc in diffs:
             votes[(tc, sc)] += 1
 
-    # majority vote per traditional char
+    # Majority vote per traditional char
     by_trad = defaultdict(list)
     for (tc, sc), n in votes.items():
         by_trad[tc].append((n, sc))
@@ -119,7 +119,7 @@ def main():
     print(f"aligned lines: {aligned}, harvested pairs: {len(table) - len(SEED)} "
           f"(+{len(SEED)} seed), ambiguous skipped: {conflicts}")
 
-    # validation: coverage over ALL traditional files
+    # Validation: coverage over ALL traditional files
     trad_files = sorted(CORPUS.glob("worldend2/zh/v0[5-9].txt")) + \
         sorted(CORPUS.glob("worldend2/zh/v1[01].txt")) + \
         [CORPUS / "worldend/zh/v05-traditional.txt"]
@@ -131,7 +131,7 @@ def main():
                 total_han += 1
                 if c not in table:
                     residual[c] += 1
-    # chars not in the table are either shared (identical in both scripts) or unmapped-trad;
+    # Chars not in the table are either shared (identical in both scripts) or unmapped-trad;
     # estimate unmapped-trad by checking against seed's value set + simp corpus frequency
     simp_corpus = (CORPUS / "worldend2/zh/v01.txt").read_text(encoding="utf-8") + \
         (CORPUS / "worldend/zh/v04.txt").read_text(encoding="utf-8")

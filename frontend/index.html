@@ -4,8 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="theme-color" content="#14181d" />
-    <meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#282c34" />
+    <script>
+      // Apply the persisted theme before any CSS or JS loads: no flash of the
+      // wrong palette, and the PWA titlebar color matches from first paint
+      (function () {
+        var theme = 'dark';
+        try {
+          var s = JSON.parse(localStorage.getItem('ww.settings.v1') || '{}');
+          if (s && s.theme === 'light') theme = 'light';
+        } catch (e) { /* Corrupted settings -> dark */ }
+        document.documentElement.dataset.theme = theme;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'light' ? '#fafafa' : '#282c34');
+      })();
+    </script>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />

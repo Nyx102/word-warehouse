@@ -11,7 +11,9 @@ import { api, ApiError } from '../api';
 import { Modal } from '../components/Modal';
 import { toast } from '../components/Toasts';
 import { useMediaQuery } from '../util';
-import { baseExtensions, languageForPath } from '../editor/cm';
+import { useSettings } from '../app/settings';
+import { applyKeymap, baseExtensions, languageForPath } from '../editor/cm';
+import { DiffText } from '../git/DiffText';
 import type { FileFull, GitFileResponse, RepoName } from '../types';
 
 interface Loaded {
@@ -22,25 +24,7 @@ interface Loaded {
   fallbackReason: string | null;
 }
 
-/** Simple colorized unified-diff text (read-only fallback for >2MB files). */
-function DiffText({ text }: { text: string }) {
-  if (!text.trim()) return <div className="empty">No diff.</div>;
-  return (
-    <div className="diff-text mono">
-      {text.split('\n').map((line, i) => {
-        let cls = 'ctx';
-        if (/^(diff --git|index |new file|deleted file|similarity|rename)/.test(line)) cls = 'meta';
-        else if (line.startsWith('+++') || line.startsWith('---')) cls = 'file';
-        else if (line.startsWith('@@')) cls = 'hunk';
-        else if (line.startsWith('+')) cls = 'add';
-        else if (line.startsWith('-')) cls = 'del';
-        return <div key={i} className={'dl ' + cls}>{line || ' '}</div>;
-      })}
-    </div>
-  );
-}
-
-/** File editor for the Diffs tab.
+/** HEAD-vs-worktree editor hosted by DiffBuffer.
  * Desktop (>=1024px): two-pane MergeView, HEAD read-only on the left,
  * working copy editable on the right, per-chunk revert arrows.
  * Mobile: single editable editor with a unified merge view and per-chunk
@@ -58,6 +42,9 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
 }) {
   const untracked = status.trim() === '??';
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const { keymap: keymapMode } = useSettings();
+  const keymapRef = useRef(keymapMode);
+  keymapRef.current = keymapMode;
 
   const [file, setFile] = useState<Loaded | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -71,6 +58,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
     getDoc: () => string;
     goPrev: () => void; // jump to previous changed chunk (no focus: keeps the
     goNext: () => void; // mobile keyboard closed while stepping through diffs)
+    views: EditorView[]; // every pane, for live keymap reconfiguration
     destroy: () => void;
   } | null>(null);
   const fileRef = useRef<Loaded | null>(null);
@@ -113,9 +101,9 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
     } catch (e) {
       const reason = e instanceof ApiError
         ? (e.status === 413
-          ? 'File is too large to edit here — showing the diff read-only.'
-          : e.message + ' — showing the diff read-only.')
-        : 'Failed to load file — showing the diff read-only.';
+          ? 'File is too large to edit here—showing the diff read-only.'
+          : e.message + '—showing the diff read-only.')
+        : 'Failed to load file—showing the diff read-only.';
       try {
         const d = await api<{ diff: string }>(
           `/api/git/diff?repo=${repo}&path=${encodeURIComponent(path)}`,
@@ -158,7 +146,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
       onChanged();
     } catch (e) {
       // 409: file changed on disk since we loaded it (toast already shown);
-      // surface a reload offer instead of silently clobbering.
+      // surface a reload offer instead of silently clobbering
       if (e instanceof ApiError && e.status === 409) setConflict(true);
     } finally {
       setSaving(false);
@@ -167,7 +155,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  // Build / rebuild the editor when the file loads or the layout mode flips.
+  // Build / rebuild the editor when the file loads or the layout mode flips
   useEffect(() => {
     if (!file || file.fallbackDiff != null || !hostRef.current) return;
     const parent = hostRef.current;
@@ -185,6 +173,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
     const base: Extension[] = baseExtensions({
       onSave: () => { void saveRef.current(); },
       wrap: isDesktop,
+      keymap: keymapRef.current,
     });
     const lang = languageForPath(path);
     if (lang) base.push(lang);
@@ -204,6 +193,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
         getDoc: () => mv.b.state.doc.toString(),
         goPrev: () => { goToPreviousChunk(mv.b); },
         goNext: () => { goToNextChunk(mv.b); },
+        views: [mv.a, mv.b],
         destroy: () => mv.destroy(),
       };
     } else {
@@ -228,6 +218,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
         getDoc: () => view.state.doc.toString(),
         goPrev: () => { goToPreviousChunk(view); },
         goNext: () => { goToNextChunk(view); },
+        views: [view],
         destroy: () => view.destroy(),
       };
     }
@@ -236,6 +227,11 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
       viewRef.current = null;
     };
   }, [file, isDesktop, path]);
+
+  // Live keymap switch on every pane; rebuilds pick the mode up via keymapRef
+  useEffect(() => {
+    viewRef.current?.views.forEach((v) => applyKeymap(v, keymapMode));
+  }, [keymapMode]);
 
   const doRevert = useCallback(async () => {
     setConfirmRevert(false);
@@ -283,7 +279,7 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
           className="btn btn-sm"
           onClick={() => setConfirmRevert(true)}
           disabled={untracked || !file}
-          title={untracked ? 'Untracked file — nothing in git to revert to' : 'Revert file to HEAD'}
+          title={untracked ? 'Untracked file—nothing in git to revert to' : 'Revert file to HEAD'}
         >Revert</button>
         <button className="btn btn-sm" onClick={onClose} title="Close editor">Close</button>
       </div>

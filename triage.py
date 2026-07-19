@@ -52,11 +52,11 @@ Items:
 _worker_lock = threading.Lock()
 _worker_running = False
 _last_failure = 0.0
-_last_error = None  # short message from the most recent failed batch (surfaced in the UI)
+_last_error = None  # Short message from the most recent failed batch (surfaced in the UI)
 
 
 def _claude_bin():
-    from chat import CLAUDE_BIN
+    from chat import CLAUDE_BIN  # Lazy: resolve the CLI at call time, not import
     return CLAUDE_BIN
 
 
@@ -83,7 +83,7 @@ def _flag_info(flag):
                 rule=f"{flag.get('find')} -> {flag.get('replace')}")
 
 
-PROMPT_VERSION = "2"  # bump on INSTRUCTIONS changes: re-judges everything
+PROMPT_VERSION = "2"  # Bump on INSTRUCTIONS changes: re-judges everything
 
 
 def _base_hash(flag):
@@ -94,7 +94,7 @@ def _base_hash(flag):
 
 
 def _key(path, flag):
-    # per-file: the same token/rule flagged in two files has different context
+    # Per-file: the same token/rule flagged in two files has different context
     return f"{path}::{flag['key']}"
 
 
@@ -103,7 +103,7 @@ def _cached(conn, path, flag):
         "SELECT context_sha256, verdict, reason, judged_at FROM ai_triage"
         " WHERE category=? AND key=?",
         (flag["category"], _key(path, flag))).fetchone()
-    if row is None:  # wildcard user override applies across files
+    if row is None:  # Wildcard user override applies across files
         row = conn.execute(
             "SELECT context_sha256, verdict, reason, judged_at FROM ai_triage"
             " WHERE category=? AND key=?",
@@ -119,7 +119,7 @@ def _needs_judgment(conn, path, flag):
     row = _cached(conn, path, flag)
     if row is None:
         return True, h
-    if row["context_sha256"] == "*":  # user override — permanent
+    if row["context_sha256"] == "*":  # User override, permanent
         return False, h
     return row["context_sha256"] != h, h
 
@@ -179,7 +179,7 @@ def run_pending(report, wait_for_chat=None):
                               context=_context_for(flag, RADII[esc])))
         try:
             verdicts = _call_batch(items)
-            _last_error = None  # a batch went through: clear any stale failure
+            _last_error = None  # A batch went through: clear any stale failure
         except Exception as e:
             _last_failure = time.time()
             _last_error = (str(e) or e.__class__.__name__)[:300]
@@ -187,7 +187,7 @@ def run_pending(report, wait_for_chat=None):
         for i, (path, flag, esc, h) in enumerate(batch, 1):
             v = verdicts.get(i)
             if not v or v.get("verdict") not in ("keep", "clear", "need_more"):
-                continue  # fail-closed: stays pending/visible
+                continue  # Fail-closed: stays pending/visible
             if v["verdict"] == "need_more":
                 if esc + 1 < len(RADII):
                     queue.append([path, flag, esc + 1, h])
@@ -211,7 +211,7 @@ def schedule(report):
     def _work():
         global _worker_running
         try:
-            import chat
+            import chat  # Lazy: mirrors _claude_bin, no chat wiring at import
 
             def wait_for_chat():
                 while chat.active_count() > 0:

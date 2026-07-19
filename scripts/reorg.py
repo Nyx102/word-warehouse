@@ -13,7 +13,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
-# historical one-shot (executed 2026-07-17, pre-unification); kept for reference
+# Historical one-shot (executed 2026-07-17, pre-unification); kept for reference
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import CORPUS  # noqa: E402
 
@@ -77,7 +77,7 @@ def sniff_lang(text: str) -> str:
     han = sum(1 for c in sample if "一" <= c <= "鿿")
     if han + kana < 50:
         return "en"
-    if kana / (han + kana) > 0.10:  # quoted JP blurbs in CN files stay far below this
+    if kana / (han + kana) > 0.10:  # Quoted JP blurbs in CN files stay far below this
         return "jp"
     trad = sum(1 for c in sample if c in TRAD_ONLY)
     simp = sum(1 for c in sample if c in SIMP_ONLY)

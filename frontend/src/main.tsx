@@ -1,7 +1,14 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
-import './styles.css';
+import App from './app/App';
+import '@fontsource/source-code-pro/400.css';
+import '@fontsource/source-code-pro/500.css';
+import '@fontsource/source-code-pro/700.css';
+import '@fontsource/source-code-pro/400-italic.css';
+import '@fontsource/source-sans-3/400.css';
+import '@fontsource/source-sans-3/600.css';
+import '@fontsource/source-sans-3/700.css';
+import './styles/index.css';
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

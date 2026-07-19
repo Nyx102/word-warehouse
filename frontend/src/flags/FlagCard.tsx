@@ -48,7 +48,8 @@ export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen }: {
     title = (
       <span className="flag-title">
         <b>{flag.key}</b>
-        {flag.closest ? <> — did you mean <b>{flag.closest}</b>?</> : null}
+        {flag.closest ? <>—did you mean <b>{flag.closest}</b>?</> : null}
+        {flag.count != null && flag.count > 1 ? ' ×' + flag.count : ''}
       </span>
     );
   } else {
@@ -72,23 +73,28 @@ export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen }: {
         </button>
       </div>
       {flag.ai?.verdict === 'keep' && (
-        <div className="ai-note">AI: keep — {flag.ai.reason}</div>
+        <div className="ai-note">AI: keep—{flag.ai.reason}</div>
       )}
-      <div className="flag-locs">
-        {(flag.locations || []).map((loc, i) => (
-          <div className="loc" key={i}>
-            <button
-              className="loc-path mono loc-open"
-              title="Open in editor"
-              onClick={() => onOpen('corpus/' + loc.path, loc.line)}
-            >{loc.path}:{loc.line}</button>
-            <span
-              className="loc-snippet"
-              dangerouslySetInnerHTML={{ __html: markLocation(loc.snippet, token, loc.col) }}
-            />
-          </div>
-        ))}
-      </div>
+      {(flag.locations || []).length > 0 && (
+        <details className="flag-locs" open={flag.locations.length <= 3}>
+          <summary className="flag-locs-sum">
+            {flag.locations.length} location{flag.locations.length === 1 ? '' : 's'}
+          </summary>
+          {flag.locations.map((loc, i) => (
+            <div className="loc" key={i}>
+              <button
+                className="loc-path mono loc-open"
+                title="Open in editor"
+                onClick={() => onOpen('corpus/' + loc.path, loc.line)}
+              >{loc.path}:{loc.line}</button>
+              <span
+                className="loc-snippet"
+                dangerouslySetInnerHTML={{ __html: markLocation(loc.snippet, token, loc.col) }}
+              />
+            </div>
+          ))}
+        </details>
+      )}
     </div>
   );
 }

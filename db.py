@@ -5,7 +5,7 @@ import threading
 
 from config import DATA, DB_PATH
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 DDL = """
 CREATE TABLE IF NOT EXISTS files(
@@ -82,7 +82,8 @@ CREATE TABLE IF NOT EXISTS threads(
   claude_session_id TEXT,
   created_at REAL,
   last_active REAL,
-  archived INTEGER DEFAULT 0
+  archived INTEGER DEFAULT 0,
+  pinned INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS messages(
@@ -136,6 +137,8 @@ def connect() -> sqlite3.Connection:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(threads)")}
     if "model" not in cols:
         conn.execute("ALTER TABLE threads ADD COLUMN model TEXT")
+    if "pinned" not in cols:
+        conn.execute("ALTER TABLE threads ADD COLUMN pinned INTEGER DEFAULT 0")
     conn.execute("INSERT OR REPLACE INTO meta(k, v) VALUES ('schema_version', ?)",
                  (str(SCHEMA_VERSION),))
     conn.commit()

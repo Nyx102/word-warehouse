@@ -4,24 +4,46 @@ import { EditorView } from '@codemirror/view';
 import { api, ApiError } from '../api';
 import { toast } from '../components/Toasts';
 import { useMediaQuery } from '../util';
-import { baseExtensions, languageForPath } from '../editor/cm';
+import { useSettings } from '../app/settings';
+import { applyKeymap, baseExtensions, languageForPath } from '../editor/cm';
 import type { FileFull } from '../types';
 
-/** Plain editable file editor for the Files tab. Loads/saves via the same
+/** Breadcrumb path: the directory part shrinks with an ellipsis, the file
+ * name always stays visible. */
+function Crumbs({ path }: { path: string }) {
+  const cut = path.lastIndexOf('/');
+  const dir = cut === -1 ? '' : path.slice(0, cut + 1);
+  const base = cut === -1 ? path : path.slice(cut + 1);
+  return (
+    <span className="fb-crumbs mono" title={path}>
+      {dir && <span className="crumb-dir">{dir}</span>}
+      <span className="crumb-file">{base}</span>
+    </span>
+  );
+}
+
+/** Plain editable file editor for file buffers. Loads/saves via the same
  * (repo=corpus) /api/file contract the Diffs editor uses (sha256 optimistic
  * concurrency), with an optional jump-to-line for flag/search deep-links. */
-export function FileEditor({ path, gotoLine, onSaved, onClose }: {
+export function FileEditor({ path, gotoLine, onSaved, onClose, onDirtyChange, onHistory }: {
   path: string;                  // project-relative (under FS_ROOT / ROOT)
   gotoLine?: number | null;      // 1-based line to scroll to + select on open
   onSaved?: () => void;
   onClose: () => void;
+  onDirtyChange?: (dirty: boolean) => void; // drives the buffer tab dirty dot
+  onHistory?: () => void;        // History toolbar button -> log buffer
 }) {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const { keymap: keymapMode } = useSettings();
+  const keymapRef = useRef(keymapMode);
+  keymapRef.current = keymapMode;
   const [content, setContent] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [wrapOverride, setWrapOverride] = useState<boolean | null>(null);
+  const wrap = wrapOverride ?? isDesktop;
 
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -39,12 +61,14 @@ export function FileEditor({ path, gotoLine, onSaved, onClose }: {
       setContent(f.content);
     } catch (e) {
       setLoadErr(e instanceof ApiError
-        ? (e.status === 413 ? 'File is too large to edit here — download it instead.' : e.message)
+        ? (e.status === 413 ? 'File is too large to edit here—download it instead.' : e.message)
         : 'Failed to load file.');
     }
   }, [path]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
   const save = useCallback(async () => {
     const v = viewRef.current;
@@ -71,12 +95,16 @@ export function FileEditor({ path, gotoLine, onSaved, onClose }: {
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  // Build / rebuild the editor when the file loads or the layout mode flips.
+  // Build / rebuild the editor when the file loads or wrap mode flips
   useEffect(() => {
     if (content == null || !hostRef.current) return;
     const parent = hostRef.current;
     parent.replaceChildren();
-    const ext = baseExtensions({ onSave: () => { void saveRef.current(); }, wrap: isDesktop });
+    const ext = baseExtensions({
+      onSave: () => { void saveRef.current(); },
+      wrap,
+      keymap: keymapRef.current,
+    });
     const lang = languageForPath(path);
     if (lang) ext.push(lang);
     ext.push(EditorView.updateListener.of((u) => {
@@ -85,9 +113,14 @@ export function FileEditor({ path, gotoLine, onSaved, onClose }: {
     const view = new EditorView({ parent, state: EditorState.create({ doc: content, extensions: ext }) });
     viewRef.current = view;
     return () => { view.destroy(); viewRef.current = null; };
-  }, [content, isDesktop, path]);
+  }, [content, wrap, path]);
 
-  // Scroll to (and select) the requested line — runs after the view is built
+  // Live keymap switch; rebuilds pick the current mode up via keymapRef
+  useEffect(() => {
+    if (viewRef.current) applyKeymap(viewRef.current, keymapMode);
+  }, [keymapMode]);
+
+  // Scroll to (and select) the requested line. Runs after the view is built
   // and again whenever a new deep-link target lands on the same open file.
   useEffect(() => {
     const v = viewRef.current;
@@ -102,9 +135,17 @@ export function FileEditor({ path, gotoLine, onSaved, onClose }: {
   return (
     <div className="merge-editor">
       <div className="editor-toolbar">
-        <span className="editor-path mono" title={path}>{path}</span>
+        <Crumbs path={path} />
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         <span className="toolbar-spacer" />
+        <button
+          className={'btn btn-sm' + (wrap ? ' toggled' : '')}
+          onClick={() => setWrapOverride(!wrap)}
+          title="Toggle line wrapping"
+        >Wrap</button>
+        {onHistory && (
+          <button className="btn btn-sm" onClick={onHistory} title="File history">History</button>
+        )}
         <a className="btn btn-sm" href={dlHref} title="Download this file">Download</a>
         <button
           className="btn btn-sm primary"

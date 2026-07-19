@@ -6,6 +6,7 @@ fresh (5 s stat scan, purely local) and re-lints when anything changed.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import queue
@@ -22,15 +23,16 @@ import chat
 import checker
 import gitops
 import search as searchmod
-from config import CORPUS, DATA, FS_ROOT, HOST, PORT, RULES_YAML
+from config import CORPUS, DATA, FS_ROOT, HOST, PORT, ROOT
 from db import connect
 from indexer import ensure_fresh
+from pathsafe import safe_corpus_path, safe_fs_path, safe_repo_path
 
 _APP_DIR = Path(__file__).resolve().parent
 _DIST = _APP_DIR / "frontend" / "dist"
 STATIC = _DIST if _DIST.is_dir() else _APP_DIR / "static"
 POLL_INTERVAL = 5
-MAX_BODY = 64 * 1024 * 1024  # reject oversize request bodies (uploads) up front
+MAX_BODY = 64 * 1024 * 1024  # Reject oversize request bodies (uploads) up front
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
         ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
@@ -51,7 +53,7 @@ def _refresh_lint(force=False, scope="all"):
 
 
 def poller():
-    import triage
+    import triage  # Lazy: keeps the AI-credit machinery out of module import
     while True:
         try:
             changed = ensure_fresh()
@@ -69,18 +71,20 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------ plumbing
     def log_message(self, fmt, *args):
-        pass  # quiet; errors surface via tracebacks
+        pass
 
-    def _json(self, obj, code=200):
+    def _json(self, obj, code=200, headers=None):
         body = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
-    def _error(self, message, code=400):
-        self._json({"error": message}, code)
+    def _error(self, message, code=400, headers=None):
+        self._json({"error": message}, code, headers)
 
     def _body(self):
         raw = getattr(self, "_raw_body", b"")
@@ -119,19 +123,19 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length") or 0)
             if n > MAX_BODY:
                 # Don't buffer a huge body just to reject it; close the socket
-                # after the 413 so the undrained bytes can't desync keep-alive.
+                # after the 413 so the undrained bytes can't desync keep-alive
                 self.close_connection = True
                 return self._error("request body too large", 413)
             self._raw_body = self.rfile.read(n) if n > 0 else b""
-            matched = False
-            for pattern, methods, fn in ROUTES:
+            for pattern, methods in ROUTES:
                 m = pattern.match(path)
                 if m:
-                    matched = True
-                    if method in methods:
-                        return fn(self, *m.groups())
-            if matched:
-                return self._error("method not allowed", 405)
+                    fn = methods.get(method)
+                    if fn is None:
+                        return self._error(
+                            "method not allowed", 405,
+                            headers={"Allow": ", ".join(sorted(methods))})
+                    return fn(self, *m.groups())
             if method == "GET":
                 return self._static(path)
             self._error("not found", 404)
@@ -206,39 +210,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("missing series")
         self._json(dict(rows=searchmod.align(series, self._q("volume") or None)))
 
-    def _safe_corpus_path(self, rel):
-        if not rel or ".git" in rel.split("/"):
-            return None
-        f = (CORPUS / rel).resolve()
-        if not str(f).startswith(str(CORPUS)):
-            return None
-        return f
-
-    def _safe_repo_path(self, repo, rel):
-        """Resolve a repo-relative path under one of gitops' repos (ROOT for
-        'corpus', the nested translation repo for 'repo'). The Diffs view lists
-        files by (repo, repo-relative path); the file API must speak the same
-        space so anything in a repo's git status is loadable/editable."""
-        base = gitops.REPOS.get(repo)
-        if base is None or not rel or ".git" in rel.split("/"):
-            return None
-        base = base.resolve()
-        f = (base / rel).resolve()
-        if not f.is_relative_to(base):
-            return None
-        return f
-
     def h_file(self):
         rel = self._q("path", "")
         repo = self._q("repo")
-        f = self._safe_repo_path(repo, rel) if repo else self._safe_corpus_path(rel)
+        f = safe_repo_path(repo, rel) if repo else safe_corpus_path(rel)
         if f is None or not f.is_file():
             return self._error("not found", 404)
         if self._q("full"):
             if f.stat().st_size > 2 * 1024 * 1024:
                 return self._error("file too large for editor", 413)
             content = f.read_text(encoding="utf-8", errors="replace")
-            import hashlib
             return self._json(dict(
                 path=rel, content=content,
                 sha256=hashlib.sha256(content.encode()).hexdigest(),
@@ -250,12 +231,10 @@ class Handler(BaseHTTPRequestHandler):
                         lines=lines[start - 1:start - 1 + count]))
 
     def h_file_put(self):
-        import hashlib
-        import os
         b = self._body()
         rel = b.get("path", "")
         repo = b.get("repo")
-        f = self._safe_repo_path(repo, rel) if repo else self._safe_corpus_path(rel)
+        f = safe_repo_path(repo, rel) if repo else safe_corpus_path(rel)
         if f is None:
             return self._error("bad path", 400)
         content = b.get("content")
@@ -273,21 +252,8 @@ class Handler(BaseHTTPRequestHandler):
                         sha256=hashlib.sha256(content.encode()).hexdigest()))
 
     # -------------------------------------------------- files tab (/api/fs/*)
-    def _safe_fs_path(self, rel):
-        """Resolve a project-relative path under FS_ROOT (the Files-tab root).
-        Blocks traversal and any .git segment (ROOT/.git + the nested repo's)."""
-        if rel is None:
-            return None
-        rel = rel.strip().lstrip("/")
-        if ".git" in rel.split("/"):
-            return None
-        f = (FS_ROOT / rel).resolve()
-        if not f.is_relative_to(FS_ROOT):
-            return None
-        return f
-
     def h_fs_list(self):
-        d = self._safe_fs_path(self._q("path", "") or "")
+        d = safe_fs_path(self._q("path", "") or "")
         if d is None or not d.is_dir():
             return self._error("not a directory", 404)
         rel = str(d.relative_to(FS_ROOT)) if d != FS_ROOT else ""
@@ -310,7 +276,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(path=rel, entries=entries))
 
     def h_fs_mkdir(self):
-        d = self._safe_fs_path(self._body().get("path", ""))
+        d = safe_fs_path(self._body().get("path", ""))
         if d is None or d == FS_ROOT:
             return self._error("bad path", 400)
         if d.exists():
@@ -319,7 +285,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(ok=True))
 
     def h_fs_create(self):
-        f = self._safe_fs_path(self._body().get("path", ""))
+        f = safe_fs_path(self._body().get("path", ""))
         if f is None or f == FS_ROOT:
             return self._error("bad path", 400)
         if f.exists():
@@ -330,8 +296,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def h_fs_rename(self):
         b = self._body()
-        src = self._safe_fs_path(b.get("path", ""))
-        dst = self._safe_fs_path(b.get("to", ""))
+        src = safe_fs_path(b.get("path", ""))
+        dst = safe_fs_path(b.get("to", ""))
         if src is None or dst is None or src == FS_ROOT or dst == FS_ROOT:
             return self._error("bad path", 400)
         if not src.exists():
@@ -343,7 +309,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(ok=True))
 
     def h_fs_delete(self):
-        f = self._safe_fs_path(self._body().get("path", ""))
+        f = safe_fs_path(self._body().get("path", ""))
         if f is None or f == FS_ROOT:
             return self._error("bad path", 400)
         if not f.exists():
@@ -355,7 +321,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(ok=True))
 
     def h_fs_download(self):
-        f = self._safe_fs_path(self._q("path", ""))
+        f = safe_fs_path(self._q("path", ""))
         if f is None or not f.is_file():
             return self._error("not found", 404)
         name = f.name.replace('"', "")
@@ -373,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(chunk)
 
     def h_fs_upload(self):
-        f = self._safe_fs_path(self._q("path", ""))
+        f = safe_fs_path(self._q("path", ""))
         if f is None or f == FS_ROOT:
             return self._error("bad path", 400)
         data = getattr(self, "_raw_body", b"")
@@ -388,13 +354,15 @@ class Handler(BaseHTTPRequestHandler):
             self._json(gitops.show(self._q("repo", "corpus"),
                                    self._q("path", ""),
                                    self._q("rev", "HEAD")))
-        except (RuntimeError, KeyError) as e:
+        except (ValueError, RuntimeError, KeyError) as e:
             self._error(str(e), 400)
 
     def h_git_revert(self):
         b = self._body()
         try:
             gitops.revert(b.get("repo", "corpus"), b.get("path", ""))
+        except ValueError as e:
+            return self._error(str(e), 400)
         except RuntimeError as e:
             return self._error(str(e), 409)
         except KeyError:
@@ -402,21 +370,14 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(ok=True))
 
     def h_thread_patch(self, tid):
-        b = self._body()
-        conn = connect()
-        if "model" in b:
-            m = b["model"]
-            if m not in ("haiku", "sonnet", "opus", "default", None):
-                return self._error("bad model", 400)
-            conn.execute("UPDATE threads SET model=? WHERE id=?", (m, int(tid)))
-        if "title" in b:
-            conn.execute("UPDATE threads SET title=? WHERE id=?",
-                         (b["title"], int(tid)))
-        conn.commit()
+        try:
+            chat.update_thread(int(tid), **self._body())
+        except (TypeError, ValueError) as e:
+            return self._error(str(e), 400)
         self._json(dict(ok=True))
 
     def h_triage_reject(self):
-        import triage
+        import triage  # Lazy: keeps the AI-credit machinery out of module import
         b = self._body()
         triage.user_override(b["category"], b["key"])
         _refresh_lint(force=True)
@@ -425,7 +386,7 @@ class Handler(BaseHTTPRequestHandler):
     def h_triage_run(self):
         """Manual 'Triage now': force a triage pass over the current flags,
         clearing any failure backoff."""
-        import triage
+        import triage  # Lazy: keeps the AI-credit machinery out of module import
         report = _refresh_lint(scope="all")
         triage.run_now(dict(report))
         self._json(dict(ok=True, triage=triage.status()))
@@ -437,7 +398,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def h_help(self):
         """Usage guide = the README's workflow section (single source of truth)."""
-        from config import ROOT
         p = ROOT / "README.md"
         text = p.read_text(encoding="utf-8") if p.is_file() else "no README"
         start = text.find("## How you actually use it")
@@ -447,7 +407,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(markdown=text))
 
     def h_lint(self):
-        import triage
+        import triage  # Lazy: keeps the AI-credit machinery out of module import
         scope = self._q("scope", "all")
         if scope not in ("raw", "finished", "all"):
             return self._error("bad scope", 400)
@@ -459,7 +419,7 @@ class Handler(BaseHTTPRequestHandler):
         triage.annotate(report)
         # Auto-run triage when flags await review and the worker is idle (not
         # already running, not in post-failure backoff). This is what actually
-        # drains "N awaiting review" — the poller only schedules on disk change.
+        # drains "N awaiting review"; the poller only schedules on disk change.
         st = triage.status()
         if report.get("triage_pending", 0) > 0 and not st["running"] and not st["in_backoff"]:
             triage.schedule(report)
@@ -541,81 +501,139 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             chat.unsubscribe(tid, q)
 
-    def h_git_status(self, ):
-        self._json(dict(files=gitops.status(self._q("repo", "corpus"))))
+    def h_git_status(self):
+        try:
+            self._json(gitops.status(self._q("repo", "corpus")))
+        except KeyError:
+            self._error("bad repo", 400)
 
     def h_git_diff(self):
-        self._json(dict(diff=gitops.diff(self._q("repo", "corpus"),
-                                         self._q("path") or None)))
+        try:
+            self._json(dict(diff=gitops.diff(self._q("repo", "corpus"),
+                                             self._q("path") or None,
+                                             self._q("mode", "head"))))
+        except ValueError as e:
+            self._error(str(e), 400)
+        except KeyError:
+            self._error("bad repo", 400)
 
     def h_git_log(self):
-        self._json(dict(log=gitops.log(self._q("repo", "corpus"),
-                                       int(self._q("n", "20")))))
+        try:
+            res = gitops.log(self._q("repo", "corpus"),
+                             n=int(self._q("n", "20")),
+                             skip=int(self._q("skip", "0")),
+                             path=self._q("path") or None)
+        except ValueError as e:
+            return self._error(str(e), 400)
+        except KeyError:
+            return self._error("bad repo", 400)
+        self._json(dict(log=res["entries"], has_more=res["has_more"]))
+
+    def h_git_show(self):
+        try:
+            self._json(gitops.commit_detail(self._q("repo", "corpus"),
+                                            self._q("rev", "")))
+        except (ValueError, RuntimeError) as e:
+            self._error(str(e), 400)
+        except KeyError:
+            self._error("bad repo", 400)
+
+    def h_git_branches(self):
+        try:
+            self._json(gitops.branches(self._q("repo", "corpus")))
+        except KeyError:
+            self._error("bad repo", 400)
+
+    def _git_mutate(self, fn, *args):
+        try:
+            fn(*args)
+        except ValueError as e:
+            return self._error(str(e), 400)
+        except RuntimeError as e:
+            return self._error(str(e), 409)
+        except KeyError:
+            return self._error("bad repo", 400)
+        self._json(dict(ok=True))
+
+    def h_git_stage(self):
+        b = self._body()
+        self._git_mutate(gitops.stage, b.get("repo", "corpus"),
+                         b.get("paths") or [])
+
+    def h_git_unstage(self):
+        b = self._body()
+        self._git_mutate(gitops.unstage, b.get("repo", "corpus"),
+                         b.get("paths") or [])
+
+    def h_git_apply(self):
+        b = self._body()
+        self._git_mutate(gitops.apply_patch, b.get("repo", "corpus"),
+                         b.get("patch") or "", bool(b.get("reverse")))
+
+    def h_git_branch(self):
+        b = self._body()
+        self._git_mutate(gitops.switch_branch, b.get("repo", "corpus"),
+                         b.get("name") or "", bool(b.get("create")))
 
     def h_git_commit(self):
         b = self._body()
         try:
             h = gitops.commit(b.get("repo", "corpus"), b.get("message", ""),
-                              b.get("paths") or [])
+                              b.get("paths") or None)
+        except ValueError as e:
+            return self._error(str(e), 400)
         except RuntimeError as e:
-            return self._error(str(e))
+            return self._error(str(e), 409)
+        except KeyError:
+            return self._error("bad repo", 400)
         self._json(dict(ok=True, hash=h))
 
 
-def R(pattern, methods, fn):
-    return (re.compile(f"^{pattern}$"), methods, fn)
+def R(pattern, **methods):
+    return (re.compile(f"^{pattern}$"), methods)
 
 
 ROUTES = [
-    R(r"/api/status", {"GET"}, Handler.h_status),
-    R(r"/api/reindex", {"POST"}, Handler.h_reindex),
-    R(r"/api/search", {"GET"}, Handler.h_search),
-    R(r"/api/chunk/(\d+)", {"GET"}, Handler.h_chunk),
-    R(r"/api/align", {"GET"}, Handler.h_align),
-    R(r"/api/file", {"GET"}, Handler.h_file),
-    R(r"/api/coverage", {"GET"}, Handler.h_coverage),
-    R(r"/api/help", {"GET"}, Handler.h_help),
-    R(r"/api/lint", {"GET"}, Handler.h_lint),
-    R(r"/api/lint/dismiss", {"POST"}, Handler.h_lint_dismiss),
-    R(r"/api/lint/undismiss", {"POST"}, Handler.h_lint_undismiss),
-    R(r"/api/threads", {"GET"}, Handler.h_threads),
-    R(r"/api/threads", {"POST"}, Handler.h_threads_create),
-    R(r"/api/threads/(\d+)", {"DELETE"}, Handler.h_thread_delete),
-    R(r"/api/threads/(\d+)/messages", {"GET"}, Handler.h_messages),
-    R(r"/api/threads/(\d+)/message", {"POST"}, Handler.h_message),
-    R(r"/api/threads/(\d+)/stream", {"GET"}, Handler.h_stream),
-    R(r"/api/threads/(\d+)/interrupt", {"POST"}, Handler.h_interrupt),
-    R(r"/api/git/status", {"GET"}, Handler.h_git_status),
-    R(r"/api/git/diff", {"GET"}, Handler.h_git_diff),
-    R(r"/api/git/log", {"GET"}, Handler.h_git_log),
-    R(r"/api/git/commit", {"POST"}, Handler.h_git_commit),
-    R(r"/api/git/file", {"GET"}, Handler.h_git_file),
-    R(r"/api/git/revert", {"POST"}, Handler.h_git_revert),
-    R(r"/api/file", {"PUT"}, Handler.h_file_put),
-    R(r"/api/threads/(\d+)", {"PATCH"}, Handler.h_thread_patch),
-    R(r"/api/triage/reject", {"POST"}, Handler.h_triage_reject),
-    R(r"/api/triage/run", {"POST"}, Handler.h_triage_run),
-    R(r"/api/fs/list", {"GET"}, Handler.h_fs_list),
-    R(r"/api/fs/mkdir", {"POST"}, Handler.h_fs_mkdir),
-    R(r"/api/fs/create", {"POST"}, Handler.h_fs_create),
-    R(r"/api/fs/rename", {"POST"}, Handler.h_fs_rename),
-    R(r"/api/fs/delete", {"POST"}, Handler.h_fs_delete),
-    R(r"/api/fs/download", {"GET"}, Handler.h_fs_download),
-    R(r"/api/fs/upload", {"POST"}, Handler.h_fs_upload),
+    R(r"/api/status", GET=Handler.h_status),
+    R(r"/api/reindex", POST=Handler.h_reindex),
+    R(r"/api/search", GET=Handler.h_search),
+    R(r"/api/chunk/(\d+)", GET=Handler.h_chunk),
+    R(r"/api/align", GET=Handler.h_align),
+    R(r"/api/file", GET=Handler.h_file, PUT=Handler.h_file_put),
+    R(r"/api/coverage", GET=Handler.h_coverage),
+    R(r"/api/help", GET=Handler.h_help),
+    R(r"/api/lint", GET=Handler.h_lint),
+    R(r"/api/lint/dismiss", POST=Handler.h_lint_dismiss),
+    R(r"/api/lint/undismiss", POST=Handler.h_lint_undismiss),
+    R(r"/api/threads", GET=Handler.h_threads, POST=Handler.h_threads_create),
+    R(r"/api/threads/(\d+)", DELETE=Handler.h_thread_delete,
+      PATCH=Handler.h_thread_patch),
+    R(r"/api/threads/(\d+)/messages", GET=Handler.h_messages),
+    R(r"/api/threads/(\d+)/message", POST=Handler.h_message),
+    R(r"/api/threads/(\d+)/stream", GET=Handler.h_stream),
+    R(r"/api/threads/(\d+)/interrupt", POST=Handler.h_interrupt),
+    R(r"/api/git/status", GET=Handler.h_git_status),
+    R(r"/api/git/diff", GET=Handler.h_git_diff),
+    R(r"/api/git/log", GET=Handler.h_git_log),
+    R(r"/api/git/show", GET=Handler.h_git_show),
+    R(r"/api/git/branches", GET=Handler.h_git_branches),
+    R(r"/api/git/commit", POST=Handler.h_git_commit),
+    R(r"/api/git/stage", POST=Handler.h_git_stage),
+    R(r"/api/git/unstage", POST=Handler.h_git_unstage),
+    R(r"/api/git/apply", POST=Handler.h_git_apply),
+    R(r"/api/git/branch", POST=Handler.h_git_branch),
+    R(r"/api/git/file", GET=Handler.h_git_file),
+    R(r"/api/git/revert", POST=Handler.h_git_revert),
+    R(r"/api/triage/reject", POST=Handler.h_triage_reject),
+    R(r"/api/triage/run", POST=Handler.h_triage_run),
+    R(r"/api/fs/list", GET=Handler.h_fs_list),
+    R(r"/api/fs/mkdir", POST=Handler.h_fs_mkdir),
+    R(r"/api/fs/create", POST=Handler.h_fs_create),
+    R(r"/api/fs/rename", POST=Handler.h_fs_rename),
+    R(r"/api/fs/delete", POST=Handler.h_fs_delete),
+    R(r"/api/fs/download", GET=Handler.h_fs_download),
+    R(r"/api/fs/upload", POST=Handler.h_fs_upload),
 ]
-
-# GET+POST share /api/threads: dispatch by method
-ROUTES = [(p, m, f) for p, m, f in ROUTES]
-
-
-def _dispatch_threads(handler):
-    if handler.command == "GET":
-        return Handler.h_threads(handler)
-    return Handler.h_threads_create(handler)
-
-
-ROUTES = [r for r in ROUTES if r[0].pattern != "^/api/threads$"]
-ROUTES.insert(10, R(r"/api/threads", {"GET", "POST"}, _dispatch_threads))
 
 
 def main():
