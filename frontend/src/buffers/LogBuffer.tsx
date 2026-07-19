@@ -1,4 +1,4 @@
-mport { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettings } from '../app/settings';
 import { useWorkspace } from '../app/workspace';
 import { fmtWhen, repoLabel } from '../git/fmt';
