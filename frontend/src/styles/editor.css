@@ -61,7 +61,10 @@
 
 /* Merge chrome; .cm-editor prefix outranks the merge package's base theme */
 .cm-merge-revert button { color: var(--accent); }
-.cm-collapsedLines { background: var(--accent-dim); color: var(--accent); }
+/* .cm-editor prefix ties the package's &light/&dark .cm-collapsedLines
+ * (0,2,0) and wins on source order; without it the editor reads as cm-light
+ * (theme.ts omits the {dark} flag) and the row paints near-white. */
+.cm-editor .cm-collapsedLines { background: var(--accent-dim); color: var(--accent); }
 .cm-editor .cm-changedLine, .cm-changedLine { background: var(--vc-added-bg); }
 .cm-editor .cm-changedText, .cm-changedText { background: var(--vc-added-hl); }
 .cm-editor .cm-deletedChunk { background: var(--vc-deleted-bg); }
