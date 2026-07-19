@@ -1,5 +1,5 @@
 import { useMediaQuery } from '../util';
-import { useSettings, type KeymapName } from '../app/settings';
+import { useSettings } from '../app/settings';
 import { useWorkspace, type RailSection } from '../app/workspace';
 import { IconChat, IconFiles, IconFlag, IconGit, IconMoon, IconSearch, IconSun } from './icons';
 
@@ -19,7 +19,7 @@ export function Rail({ busy, dirty, onOpenSheet }: {
   onOpenSheet: () => void;
 }) {
   const ws = useWorkspace();
-  const { theme, setTheme, keymap, setKeymap } = useSettings();
+  const { theme, setTheme } = useSettings();
   // Below 1024px the sidebar is an overlay drawer instead of an inline column
   const isNarrow = useMediaQuery('(max-width: 1023px)');
 
@@ -63,16 +63,6 @@ export function Rail({ busy, dirty, onOpenSheet }: {
         title="Toggle color theme"
         aria-label="Toggle color theme"
       >{theme === 'dark' ? <IconSun /> : <IconMoon />}</button>
-      <select
-        className="rail-keymap"
-        value={keymap}
-        onChange={(e) => setKeymap(e.target.value as KeymapName)}
-        title="Editor keymap"
-        aria-label="Editor keymap"
-      >
-        <option value="normal">N</option>
-        <option value="vim">V</option>
-      </select>
       <button
         className={'status-dot-btn' + (busy ? ' busy' : dirty ? ' dirty' : '')}
         onClick={onOpenSheet}

@@ -41,10 +41,12 @@ function Workbench() {
         <div className="ws-center">
           <TabBar />
           <div className="ws-work">
-            <BufferArea />
+            <div className="ws-main">
+              <BufferArea />
+              <ModeLine status={status} busy={busy} />
+            </div>
             <ChatDock threadsApi={threadsApi} onTurnActiveChange={setChatBusy} />
           </div>
-          <ModeLine status={status} busy={busy} />
         </div>
       </div>
       <MobileNav busy={busy} dirty={dirty} onOpenSheet={() => setSheetOpen(true)} />
