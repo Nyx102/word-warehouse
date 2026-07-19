@@ -110,8 +110,10 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  padding: 0 24px;
   color: var(--fg);
   font-size: 14px;
+  text-align: center;
 }
 .buffer-empty p { margin: 0; }
 
