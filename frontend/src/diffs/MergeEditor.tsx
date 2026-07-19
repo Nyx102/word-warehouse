@@ -12,7 +12,8 @@ import { Modal } from '../components/Modal';
 import { toast } from '../components/Toasts';
 import { useMediaQuery } from '../util';
 import { useSettings } from '../app/settings';
-import { applyKeymap, baseExtensions, languageForPath } from '../editor/cm';
+import { applyKeymap, baseExtensions, flashLine, languageForPath, wireVimModeIndicator } from '../editor/cm';
+import { setVimMode } from '../editor/vimModeStore';
 import { DiffText } from '../git/DiffText';
 import type { FileFull, GitFileResponse, RepoName } from '../types';
 
@@ -33,10 +34,12 @@ interface Loaded {
  * `path` is repo-relative; both the git endpoints and /api/file take (repo,
  * path) and resolve it under that repo's root, so any file in the repo's git
  * status is loadable/editable (including code at the project root). */
-export function MergeEditor({ repo, path, status, onChanged, onClose }: {
+export function MergeEditor({ repo, path, status, gotoLine, active, onChanged, onClose }: {
   repo: RepoName;
   path: string;
   status: string;
+  gotoLine?: number | null;
+  active?: boolean; // is this the visible buffer? drives modeline vim-mode + autofocus
   onChanged: () => void;
   onClose: () => void;
 }) {
@@ -45,6 +48,9 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
   const { keymap: keymapMode } = useSettings();
   const keymapRef = useRef(keymapMode);
   keymapRef.current = keymapMode;
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const vimUnsubRef = useRef<(() => void) | null>(null);
 
   const [file, setFile] = useState<Loaded | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -155,6 +161,21 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
   const saveRef = useRef(save);
   saveRef.current = save;
 
+  // Wires/unwires the modeline's live vim-state readout against the
+  // editable pane (mv.b desktop / the single view on mobile — mv.a is
+  // read-only and can never be in insert mode). Same guard as FileEditor:
+  // only the instance holding the wiring may clear the (global) store.
+  const rewireVimMode = useCallback((view: EditorView | null) => {
+    const hadWiring = vimUnsubRef.current !== null;
+    vimUnsubRef.current?.();
+    vimUnsubRef.current = null;
+    if (view && activeRef.current && keymapRef.current === 'vim') {
+      vimUnsubRef.current = wireVimModeIndicator(view, setVimMode);
+    } else if (hadWiring) {
+      setVimMode(null);
+    }
+  }, []);
+
   // Build / rebuild the editor when the file loads or the layout mode flips
   useEffect(() => {
     if (!file || file.fallbackDiff != null || !hostRef.current) return;
@@ -222,16 +243,48 @@ export function MergeEditor({ repo, path, status, onChanged, onClose }: {
         destroy: () => view.destroy(),
       };
     }
+    // The editable pane is always last: [a, b] on desktop, [view] on mobile
+    const target = viewRef.current.views[viewRef.current.views.length - 1];
+    rewireVimMode(target);
+    if (activeRef.current) target.focus();
     return () => {
       viewRef.current?.destroy();
       viewRef.current = null;
+      rewireVimMode(null);
     };
-  }, [file, isDesktop, path]);
+  }, [file, isDesktop, path, rewireVimMode]);
+
+  // Buffer switched to active (tab click) without a rebuild -> grab focus
+  // and resync the modeline, same as FileEditor
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!v) return;
+    const target = v.views[v.views.length - 1];
+    if (active) target.focus();
+    rewireVimMode(target);
+  }, [active, rewireVimMode]);
 
   // Live keymap switch on every pane; rebuilds pick the mode up via keymapRef
   useEffect(() => {
     viewRef.current?.views.forEach((v) => applyKeymap(v, keymapMode));
-  }, [keymapMode]);
+    const v = viewRef.current;
+    if (v) rewireVimMode(v.views[v.views.length - 1]);
+  }, [keymapMode, rewireVimMode]);
+
+  // Scroll to and briefly flash the requested line (e.g. a Magit hunk
+  // visit) — same selection-based highlight as any other jump-to-line in
+  // this app, just cleared afterward instead of left stuck. Runs after the
+  // view (re)builds and again whenever a new target line lands on the same
+  // open diff.
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!v || !gotoLine || gotoLine < 1) return;
+    // Desktop pairs [HEAD (read-only), working copy]; the target line is
+    // against the working copy, same side the mobile unified view edits.
+    const target = v.views[v.views.length - 1];
+    if (gotoLine > target.state.doc.lines) return;
+    flashLine(target, target.state.doc.line(gotoLine).from);
+  }, [gotoLine, file, isDesktop]);
 
   const doRevert = useCallback(async () => {
     setConfirmRevert(false);

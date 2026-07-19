@@ -16,9 +16,10 @@ import type { RepoName } from '../types';
 /** Single-file diff/edit buffer: the shared MergeEditor (HEAD vs worktree,
  * sha256 save flow, per-chunk revert, >2MB DiffText fallback) plus a thin
  * git toolbar for history and index moves. */
-export function DiffBuffer({ repo, path }: { repo: RepoName; path: string }) {
+export function DiffBuffer({ repo, path, line }: { repo: RepoName; path: string; line?: number | null }) {
   const ws = useWorkspace();
   const id = useMemo(() => bufferId({ kind: 'diff', repo, path }), [repo, path]);
+  const active = ws.activeId === id;
   const status = useAsync(() => gitStatus(repo), [repo]);
   const [busy, setBusy] = useState(false);
 
@@ -71,6 +72,8 @@ export function DiffBuffer({ repo, path }: { repo: RepoName; path: string }) {
         repo={repo}
         path={path}
         status={entry?.status ?? ''}
+        gotoLine={line ?? null}
+        active={active}
         onChanged={() => notifyGitChanged(repo)}
         onClose={() => ws.close(id)}
       />

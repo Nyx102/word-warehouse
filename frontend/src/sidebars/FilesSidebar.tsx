@@ -4,7 +4,7 @@ import { toast } from '../components/Toasts';
 import { Modal } from '../components/Modal';
 import { FileTree } from '../files/FileTree';
 import { useWorkspace } from '../app/workspace';
-import { IconFilePlus, IconFolderPlus, IconRefresh, IconUpload } from '../shell/icons';
+import { IconChart, IconFilePlus, IconFolderPlus, IconRefresh, IconUpload } from '../shell/icons';
 import type { DirEntry } from '../types';
 
 const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
@@ -16,7 +16,8 @@ type Menu = { entry: DirEntry; x: number; y: number } | null;
 
 /** Files section: lazy tree with a create/upload toolbar plus per-entry
  * actions (rename/delete/download) on a kebab or right-click menu. Clicking
- * a file opens it as a workspace buffer. */
+ * a file opens it as a workspace buffer. The coverage report lives in this
+ * toolbar too — it's a corpus-content report, not a git operation. */
 export function FilesSidebar() {
   const ws = useWorkspace();
   const [sel, setSel] = useState<DirEntry | null>(null);
@@ -127,6 +128,11 @@ export function FilesSidebar() {
           onClick={() => fileInputRef.current?.click()}
         ><IconUpload /></button>
         <span className="toolbar-spacer" />
+        <button
+          className="icon-btn fs-tool-btn"
+          title="Translation coverage report" aria-label="Translation coverage report"
+          onClick={() => { ws.open({ kind: 'coverage' }); ws.setDrawerOpen(false); }}
+        ><IconChart /></button>
         <button
           className="icon-btn fs-tool-btn"
           title="Refresh tree" aria-label="Refresh tree"

@@ -24,6 +24,7 @@ export function MobileNav({ busy, dirty, onOpenSheet }: {
       ws.setChatDock('full');
       return;
     }
+    if (s === 'git') ws.open({ kind: 'magit', repo: ws.gitRepo });
     if (ws.rail === s && ws.drawerOpen) {
       ws.setDrawerOpen(false);
       return;

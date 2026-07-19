@@ -1,10 +1,12 @@
-import { Compartment, Prec, type Extension } from '@codemirror/state';
+import { Compartment, EditorSelection, Prec, StateEffect, StateField, type Extension } from '@codemirror/state';
 import {
   EditorView,
+  RectangleMarker,
   ViewPlugin,
   drawSelection,
   highlightActiveLine,
   keymap,
+  layer,
   lineNumbers,
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
@@ -36,6 +38,62 @@ function wireModalSave() {
 
 const keymapCompartment = new Compartment();
 const themeCompartment = new Compartment();
+
+/* Flash-line: an overlay rectangle painted the same way CodeMirror's own
+ * selection layer is (RectangleMarker, same as drawSelection()) — visually
+ * as strong as a real selection, but it's cosmetic only. Unlike an actual
+ * selection, it can never collapse/hijack the cursor when the user moves or
+ * types, because state.selection is never touched. */
+const setFlashRange = StateEffect.define<{ from: number; to: number } | null>();
+
+const flashRangeField = StateField.define<{ from: number; to: number } | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setFlashRange)) value = e.value;
+    if (value && tr.docChanged) {
+      value = { from: tr.changes.mapPos(value.from), to: tr.changes.mapPos(value.to) };
+    }
+    return value;
+  },
+});
+
+const flashLayer = layer({
+  above: false,
+  class: 'cm-flashLayer',
+  update: (update) => update.state.field(flashRangeField) !== update.startState.field(flashRangeField)
+    || update.docChanged || update.viewportChanged,
+  markers: (view) => {
+    const range = view.state.field(flashRangeField, false);
+    if (!range) return [];
+    return RectangleMarker.forRange(view, 'cm-flash-rect', EditorSelection.range(range.from, range.to));
+  },
+});
+
+export function flashLineExt(): Extension {
+  return [flashRangeField, flashLayer];
+}
+
+/** Scroll to a line, place the real cursor there (so moving afterward
+ * continues from the flash target instead of wherever it happened to be
+ * before), and briefly highlight it. The highlight is a cosmetic overlay,
+ * not a spanning selection, so it can't hijack the next arrow key into
+ * collapsing a range — but the cursor placement itself is real and stays
+ * put after the flash fades. `ms` must match the `.cm-flash-rect` fade
+ * duration (editor.css) so removal lines up with the animation finishing
+ * instead of an abrupt cut. */
+export function flashLine(view: EditorView, pos: number, ms = 1200): void {
+  const line = view.state.doc.lineAt(pos);
+  view.dispatch({
+    selection: { anchor: line.from },
+    effects: [
+      EditorView.scrollIntoView(line.from, { y: 'center' }),
+      setFlashRange.of({ from: line.from, to: line.to }),
+    ],
+  });
+  window.setTimeout(() => {
+    view.dispatch({ effects: setFlashRange.of(null) });
+  }, ms);
+}
 
 function modalExt(mode: KeymapName): Extension {
   if (mode === 'vim') return vim();
@@ -87,6 +145,7 @@ export function baseExtensions({ onSave, wrap, keymap: mode }: {
     lineNumbers(),
     highlightActiveLine(),
     drawSelection(),
+    flashLineExt(),
     history(),
     highlightSelectionMatches(),
     keymap.of([

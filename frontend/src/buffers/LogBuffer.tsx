@@ -1,20 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSettings } from '../app/settings';
 import { useWorkspace } from '../app/workspace';
-import { fmtWhen } from '../git/fmt';
+import { fmtWhen, repoLabel } from '../git/fmt';
 import { gitLog } from '../git/gitApi';
 import type { GitLogEntry, RepoName } from '../types';
+import { bufferId } from '../workspace/buffers';
 
 const PAGE = 30;
 
 /** Paged commit log; with a path it becomes that file's history (--follow).
- * Rows open the commit buffer; keyboard n/p/RET on the container. */
+ * Rows open the commit buffer; keyboard n/p (or j/k in vim keymap)/RET on
+ * the container. */
 export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null }) {
   const ws = useWorkspace();
+  const { keymap } = useSettings();
   const [entries, setEntries] = useState<GitLogEntry[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [point, setPoint] = useState(0);
+  // null = nothing pointed at yet; don't highlight a row until the user
+  // actually clicks or presses a nav key
+  const [point, setPoint] = useState<number | null>(null);
   const seqRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const rowEls = useRef(new Map<number, HTMLDivElement>());
@@ -37,30 +43,37 @@ export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null
 
   useEffect(() => {
     setEntries([]);
-    setPoint(0);
+    setPoint(null);
     void loadPage(0);
   }, [loadPage]);
 
   useEffect(() => {
-    rowEls.current.get(point)?.scrollIntoView({ block: 'nearest' });
+    if (point !== null) rowEls.current.get(point)?.scrollIntoView({ block: 'nearest' });
   }, [point]);
+
+  // Buffer stays mounted (CSS-hidden) across tab switches; grab focus on
+  // activation so keyboard nav works without clicking a row first
+  const active = ws.activeId === bufferId({ kind: 'log', repo, path });
+  useEffect(() => { if (active) containerRef.current?.focus(); }, [active]);
 
   const openCommit = (e: GitLogEntry) => ws.open({ kind: 'commit', repo, rev: e.oid });
 
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Tab never gets to do browser default focus-cycling in here
+    if (e.key === 'Tab') { e.preventDefault(); return; }
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+    const down = () => setPoint((i) => (i === null ? 0 : Math.min(entries.length - 1, i + 1)));
+    const up = () => setPoint((i) => (i === null ? entries.length - 1 : Math.max(0, i - 1)));
     switch (e.key) {
-      case 'n': case 'ArrowDown':
-        e.preventDefault();
-        setPoint((i) => Math.min(entries.length - 1, i + 1));
-        break;
-      case 'p': case 'ArrowUp':
-        e.preventDefault();
-        setPoint((i) => Math.max(0, i - 1));
-        break;
+      case 'ArrowDown': e.preventDefault(); down(); break;
+      case 'ArrowUp': e.preventDefault(); up(); break;
+      case 'j': if (keymap === 'vim') { e.preventDefault(); down(); } break;
+      case 'k': if (keymap === 'vim') { e.preventDefault(); up(); } break;
+      case 'n': if (keymap !== 'vim') { e.preventDefault(); down(); } break;
+      case 'p': if (keymap !== 'vim') { e.preventDefault(); up(); } break;
       case 'Enter':
-        if (entries[point]) { e.preventDefault(); openCommit(entries[point]); }
+        if (point !== null && entries[point]) { e.preventDefault(); openCommit(entries[point]); }
         break;
     }
   };
@@ -73,7 +86,7 @@ export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null
         </span>
         {path && <span className="dim">follows renames</span>}
         <span className="toolbar-spacer" />
-        <span className="log-repo dim">{repo === 'corpus' ? 'Corpus' : 'Translation'}</span>
+        <span className="log-repo dim">{repoLabel(repo)}</span>
       </div>
       {error && (
         <div className="magit-error">

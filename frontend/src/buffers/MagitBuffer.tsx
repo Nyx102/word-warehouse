@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSettings } from '../app/settings';
 import { useWorkspace } from '../app/workspace';
 import { toast } from '../components/Toasts';
 import { DiffText } from '../git/DiffText';
@@ -9,7 +10,8 @@ import {
   type DiffFile,
   type DiffHunk,
 } from '../git/diffParse';
-import { fileLabel, fmtWhen, statusChar, statusClass, type GitSection } from '../git/fmt';
+import { fileLabel, fmtWhen, repoLabel, statusChar, statusClass, type GitSection } from '../git/fmt';
+import { IconChevronRight } from '../shell/icons';
 import {
   gitApply,
   gitCommitStaged,
@@ -60,6 +62,7 @@ const byPath = (files: DiffFile[]) => new Map(files.map((f) => [f.path, f]));
  * staged set. Roving point keyboard model bound on the buffer container. */
 export function MagitBuffer({ repo }: { repo: RepoName }) {
   const ws = useWorkspace();
+  const { keymap } = useSettings();
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +107,11 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   // Re-poll cheap reads whenever the buffer becomes the active tab
   const active = ws.activeId === 'magit:' + repo;
   useEffect(() => { if (active) void refetch(); }, [active, refetch]);
+  // Buffers stay mounted (CSS-hidden) across tab switches, so keyboard nav
+  // (n/p/j/k, TAB to expand) only works if we grab focus on activation —
+  // otherwise the first keypress after switching tabs falls through to
+  // whatever the browser's default tab order last focused
+  useEffect(() => { if (active) containerRef.current?.focus(); }, [active]);
 
   const files = data?.status.files ?? [];
   const untrackedFiles = files.filter((f) => f.untracked);
@@ -138,8 +146,11 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, expanded]);
 
+  // pointKey stays null (nothing highlighted) until the user actually clicks
+  // a row or presses a nav key — a fallback-to-row-0 default read as "one
+  // row is randomly stuck selected" before any interaction happened
   const foundIdx = pointKey === null ? -1 : rows.findIndex((r) => r.key === pointKey);
-  const pointIndex = rows.length === 0 ? -1
+  const pointIndex = pointKey === null || rows.length === 0 ? -1
     : foundIdx === -1 ? Math.min(lastIdxRef.current, rows.length - 1) : foundIdx;
   if (pointIndex >= 0) lastIdxRef.current = pointIndex;
   const pointRow = pointIndex >= 0 ? rows[pointIndex] : null;
@@ -156,7 +167,9 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
 
   const move = (delta: number) => {
     if (!rows.length) return;
-    const next = Math.max(0, Math.min(rows.length - 1, pointIndex + delta));
+    const next = pointIndex < 0
+      ? (delta > 0 ? 0 : rows.length - 1)
+      : Math.max(0, Math.min(rows.length - 1, pointIndex + delta));
     setPointKey(rows[next].key);
   };
 
@@ -202,10 +215,13 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
     if (row.type === 'commit') {
       ws.open({ kind: 'commit', repo, rev: row.entry.oid });
     } else if (row.type === 'hunk') {
-      ws.open({ kind: 'file', path: repoFsPath(repo, row.path), line: row.hunk.newStart });
+      // A hunk means "show me that change" — the merge editor, scrolled to
+      // and briefly flashing that exact line
+      ws.open({ kind: 'diff', repo, path: row.path, line: row.hunk.newStart });
     } else {
-      const line = row.diff?.hunks[0]?.newStart ?? null;
-      ws.open({ kind: 'file', path: repoFsPath(repo, row.entry.path), line });
+      // The filename itself just means "open the file" — plain editor, top
+      // of file, no target line
+      ws.open({ kind: 'file', path: repoFsPath(repo, row.entry.path) });
     }
   };
 
@@ -232,16 +248,23 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return;
-    if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab')) return;
+    // Tab never gets to do browser default focus-cycling in here, even from
+    // a focused button — it's either "expand this row" or nothing
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (pointRow?.type === 'file' && pointRow.diff?.hunks.length && pointRow.section !== 'untracked') {
+        toggleExpand(pointRow.key);
+      }
+      return;
+    }
+    if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
     switch (e.key) {
-      case 'n': case 'ArrowDown': e.preventDefault(); move(1); break;
-      case 'p': case 'ArrowUp': e.preventDefault(); move(-1); break;
-      case 'Tab':
-        if (pointRow?.type === 'file' && pointRow.diff?.hunks.length && pointRow.section !== 'untracked') {
-          e.preventDefault();
-          toggleExpand(pointRow.key);
-        }
-        break;
+      case 'ArrowDown': e.preventDefault(); move(1); break;
+      case 'ArrowUp': e.preventDefault(); move(-1); break;
+      case 'j': if (keymap === 'vim') { e.preventDefault(); move(1); } break;
+      case 'k': if (keymap === 'vim') { e.preventDefault(); move(-1); } break;
+      case 'n': if (keymap !== 'vim') { e.preventDefault(); move(1); } break;
+      case 'p': if (keymap !== 'vim') { e.preventDefault(); move(-1); } break;
       case 'd':
         if (pointRow?.type === 'file' && pointRow.diff?.hunks.length && pointRow.section !== 'untracked') {
           toggleExpand(pointRow.key, 'open');
@@ -275,7 +298,9 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
             if (canExpand) toggleExpand(key);
           }}
         >
-          <span className="magit-expander dim">{canExpand ? (isOpen ? '▾' : '▸') : ' '}</span>
+          <span className={'magit-expander' + (isOpen ? ' open' : '')}>
+            {canExpand && <IconChevronRight />}
+          </span>
           <span className={'git-st ' + statusClass(ch)}>{ch}</span>
           <span className="magit-path mono" title={f.path}>{fileLabel(f)}</span>
           <span className="row-actions">
@@ -363,7 +388,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   return (
     <div className="magit" tabIndex={0} ref={containerRef} onKeyDown={onKey}>
       <div className="magit-head">
-        <span className="magit-repo">{repo === 'corpus' ? 'Corpus' : 'Translation'}</span>
+        <span className="magit-repo">{repoLabel(repo)}</span>
         <span className="magit-branch mono">{b ? (b.head ?? 'detached') : '…'}</span>
         {b && b.ahead != null && (b.ahead > 0 || (b.behind ?? 0) > 0) && (
           <span className="magit-ab" title={`ahead ${b.ahead}, behind ${b.behind} of ${b.upstream ?? 'upstream'}`}>
@@ -371,7 +396,9 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
           </span>
         )}
         <span className="toolbar-spacer" />
-        <span className="magit-keys dim">n/p move · TAB expand · s/u stage/unstage · RET visit · c commit · g refresh</span>
+        <span className="magit-keys dim">
+          {keymap === 'vim' ? 'j/k move' : 'n/p move'} · TAB expand · s/u stage/unstage · RET visit · c commit · g refresh
+        </span>
         <button className="btn btn-sm" onClick={() => void refetch()} disabled={loading} title="Refresh (g)">
           {loading ? '…' : '↻'}
         </button>
@@ -399,8 +426,9 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
                     className={'magit-row magit-commit-row' + (pointRow?.key === key ? ' point' : '')}
                     ref={setRowEl(key)}
                     onClick={() => {
+                      // Pure navigation, unlike a file row's click-to-expand —
+                      // don't pin it as "selected" forever after you leave
                       focusSelf();
-                      setPointKey(key);
                       ws.open({ kind: 'commit', repo, rev: e.oid });
                     }}
                   >

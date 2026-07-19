@@ -38,6 +38,9 @@ export function Rail({ busy, dirty, onOpenSheet }: {
       ws.setSidebarCollapsed(false);
     }
     if (s === 'chat' && ws.chatDock === 'hidden') ws.setChatDock('docked');
+    // Git has one obvious landing view; always surface it, don't make the
+    // user hunt through the sidebar for a "Status" button
+    if (s === 'git') ws.open({ kind: 'magit', repo: ws.gitRepo });
   };
 
   return (

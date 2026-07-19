@@ -2,15 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { useWorkspace } from '../app/workspace';
 import { useAsync } from '../hooks/useAsync';
 import { toast } from '../components/Toasts';
-import { fileLabel, statusClass } from '../git/fmt';
+import { fileLabel, repoLabel, statusClass } from '../git/fmt';
 import { gitBranches, gitStatus, gitSwitchBranch, onGitMutate } from '../git/gitApi';
+import { IconChevronRight, IconGit, IconHistory } from '../shell/icons';
 import type { GitStatusFile, RepoName } from '../types';
 
 /** Git section: repo picker, branch block (switch/create), dirty summary,
- * magit/log/coverage launchers, compact changed-file list. */
+ * status/log launchers, compact changed-file list. (Coverage isn't a git
+ * operation — it lives in Files, next to the corpus content it reports on.)
+ * Clicking the Git rail icon also jumps straight to status, but the button
+ * stays here too — opening a diff or commit from this same sidebar leaves
+ * the rail on 'git' the whole time, so the rail click alone isn't a
+ * reliable way back. */
 export function GitSidebar() {
   const ws = useWorkspace();
-  const [repo, setRepo] = useState<RepoName>('corpus');
+  const repo = ws.gitRepo;
   const [creating, setCreating] = useState(false);
   const [newBranch, setNewBranch] = useState('');
   const [switching, setSwitching] = useState(false);
@@ -31,9 +37,13 @@ export function GitSidebar() {
   }, [reloadAll]);
   useEffect(() => { if (ws.rail === 'git') reloadAll(); }, [ws.rail, reloadAll]);
 
-  const openBuffer = (kind: 'magit' | 'log' | 'coverage') => {
-    if (kind === 'coverage') ws.open({ kind: 'coverage' });
-    else ws.open(kind === 'magit' ? { kind: 'magit', repo } : { kind: 'log', repo });
+  const openStatus = () => { ws.open({ kind: 'magit', repo }); ws.setDrawerOpen(false); };
+  const openLog = () => { ws.open({ kind: 'log', repo }); ws.setDrawerOpen(false); };
+  // Switching which repo you're looking at should show that repo's status,
+  // not silently leave whatever buffer happened to be open
+  const selectRepo = (r: RepoName) => {
+    ws.setGitRepo(r);
+    ws.open({ kind: 'magit', repo: r });
     ws.setDrawerOpen(false);
   };
 
@@ -42,7 +52,10 @@ export function GitSidebar() {
     setSwitching(true);
     const r = await gitSwitchBranch(repo, name);
     setSwitching(false);
-    if (r.ok) toast('Switched to ' + name, 'ok');
+    if (r.ok) {
+      toast('Switched to ' + name, 'ok');
+      openStatus();
+    }
     // Conflict path (409 toasted by api) still needs a resync
     reloadAll();
   };
@@ -57,6 +70,7 @@ export function GitSidebar() {
       toast('Created ' + name, 'ok');
       setCreating(false);
       setNewBranch('');
+      openStatus();
     }
     reloadAll();
   };
@@ -91,43 +105,43 @@ export function GitSidebar() {
       <div className="seg" role="group" aria-label="Repository">
         <button
           className={'seg-btn' + (repo === 'corpus' ? ' active' : '')}
-          onClick={() => setRepo('corpus')}
-        >Corpus</button>
+          onClick={() => selectRepo('corpus')}
+        >{repoLabel('corpus')}</button>
         <button
           className={'seg-btn' + (repo === 'repo' ? ' active' : '')}
-          onClick={() => setRepo('repo')}
-        >Translation</button>
+          onClick={() => selectRepo('repo')}
+        >{repoLabel('repo')}</button>
       </div>
 
       <div className="git-branchblock">
         <div className="git-branch-row">
-          <span className="git-branch-name mono" title="Current branch">
-            {cur ?? (branches.data ? 'detached' : '…')}
+          <span className="git-branch-select-wrap">
+            <select
+              className="git-branch-select mono"
+              value={cur ?? ''}
+              disabled={switching || !branches.data}
+              onChange={(e) => void doSwitch(e.target.value)}
+              aria-label="Switch branch"
+              title="Switch branch"
+            >
+              {cur === null && <option value="" disabled hidden>{branches.data ? 'detached' : '…'}</option>}
+              {(branches.data?.branches ?? []).map((br) => (
+                <option key={br.name} value={br.name}>{br.name}</option>
+              ))}
+            </select>
+            <span className="git-branch-caret"><IconChevronRight /></span>
           </span>
           {b && b.ahead != null && (b.ahead > 0 || (b.behind ?? 0) > 0) && (
             <span className="magit-ab" title={`ahead ${b.ahead}, behind ${b.behind}`}>
               ↑{b.ahead} ↓{b.behind}
             </span>
           )}
-        </div>
-        <div className="git-branch-row">
-          <select
-            className="git-branch-select"
-            value={cur ?? ''}
-            disabled={switching || !branches.data}
-            onChange={(e) => void doSwitch(e.target.value)}
-            aria-label="Switch branch"
-          >
-            {cur === null && <option value="" disabled hidden>—</option>}
-            {(branches.data?.branches ?? []).map((br) => (
-              <option key={br.name} value={br.name}>{br.name}</option>
-            ))}
-          </select>
           <button
-            className="btn btn-sm"
-            onClick={() => setCreating((v) => !v)}
-            title="Create a new branch"
-          >New</button>
+            className={'git-branch-new' + (creating ? ' active' : '')}
+            onClick={() => { setCreating((v) => !v); setNewBranch(''); }}
+            title={creating ? 'Cancel' : 'New branch'}
+            aria-label={creating ? 'Cancel' : 'New branch'}
+          >{creating ? '×' : '+'}</button>
         </div>
         {creating && (
           <div className="git-branch-row">
@@ -137,7 +151,10 @@ export function GitSidebar() {
               placeholder="new branch name"
               autoFocus
               onChange={(e) => setNewBranch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void doCreate(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void doCreate();
+                if (e.key === 'Escape') { setCreating(false); setNewBranch(''); }
+              }}
             />
             <button
               className="btn btn-sm primary"
@@ -155,9 +172,12 @@ export function GitSidebar() {
       </div>
 
       <div className="git-actions">
-        <button className="btn btn-sm primary" onClick={() => openBuffer('magit')}>Status</button>
-        <button className="btn btn-sm" onClick={() => openBuffer('log')}>Log</button>
-        <button className="btn btn-sm" onClick={() => openBuffer('coverage')}>Coverage</button>
+        <button className="btn btn-sm git-action" onClick={openStatus} title="Open the status view">
+          <IconGit /><span>Status</span>
+        </button>
+        <button className="btn btn-sm git-action" onClick={openLog} title="Full commit history">
+          <IconHistory /><span>Log</span>
+        </button>
       </div>
 
       <div className="git-filelist">

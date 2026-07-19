@@ -1,6 +1,7 @@
 import { fmtAge } from '../util';
 import { useSettings, type KeymapName } from '../app/settings';
 import { useWorkspace } from '../app/workspace';
+import { repoLabel } from '../git/fmt';
 import type { RepoName, StatusInfo } from '../types';
 
 /** Status overlay: index freshness, dirty counts (tap to open magit), chat
@@ -38,11 +39,11 @@ export function StatusSheet({ status, busy, onClose }: {
           <span>{idx?.last_scan_age_s != null ? `scanned ${fmtAge(idx.last_scan_age_s)} ago` : '—'}</span>
         </div>
         <button className="sheet-row linkish" onClick={() => jump('corpus')}>
-          <span>Corpus dirty files</span>
+          <span>{repoLabel('corpus')} dirty files</span>
           <span>{dirtyCorpus}</span>
         </button>
         <button className="sheet-row linkish" onClick={() => jump('repo')}>
-          <span>Repo dirty files</span>
+          <span>{repoLabel('repo')} dirty files</span>
           <span>{dirtyRepo}</span>
         </button>
         <div className="sheet-row">

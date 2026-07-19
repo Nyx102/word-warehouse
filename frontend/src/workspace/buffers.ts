@@ -6,7 +6,7 @@ import type { RepoName } from '../types';
 
 export type BufferDesc =
   | { kind: 'file'; path: string; line?: number | null }
-  | { kind: 'diff'; repo: RepoName; path: string }
+  | { kind: 'diff'; repo: RepoName; path: string; line?: number | null }
   | { kind: 'magit'; repo: RepoName }
   | { kind: 'log'; repo: RepoName; path?: string | null }
   | { kind: 'commit'; repo: RepoName; rev: string }
@@ -89,7 +89,9 @@ export function sanitizeDesc(raw: unknown): BufferDesc | null {
         ? { kind: 'file', path: d.path, line: typeof d.line === 'number' ? d.line : null }
         : null;
     case 'diff':
-      return isRepo(d.repo) && isStr(d.path) ? { kind: 'diff', repo: d.repo, path: d.path } : null;
+      return isRepo(d.repo) && isStr(d.path)
+        ? { kind: 'diff', repo: d.repo, path: d.path, line: typeof d.line === 'number' ? d.line : null }
+        : null;
     case 'magit':
       return isRepo(d.repo) ? { kind: 'magit', repo: d.repo } : null;
     case 'log':

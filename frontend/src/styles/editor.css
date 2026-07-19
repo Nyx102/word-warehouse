@@ -46,6 +46,19 @@
 .merge-host > .cm-editor { height: 100%; }
 .cm-editor { font-size: 13px; }
 
+/* Jump-to-line flash (flashLine()): a cosmetic overlay rect drawn the same
+ * way CodeMirror draws real selections, so it's equally visible without
+ * ever touching actual selection state. Holds briefly then fades via CSS —
+ * the JS side removes the element right as the fade finishes (its `ms`
+ * must match this animation's duration), so the two hand off seamlessly
+ * instead of the rect just vanishing outright. */
+@keyframes cm-flash-fade {
+  0%, 55% { background-color: var(--selection); }
+  100% { background-color: transparent; }
+}
+.cm-flashLayer { pointer-events: none; }
+.cm-flash-rect { animation: cm-flash-fade 1.2s ease-in; pointer-events: none; }
+
 /* Merge chrome; .cm-editor prefix outranks the merge package's base theme */
 .cm-merge-revert button { color: var(--accent); }
 .cm-collapsedLines { background: var(--accent-dim); color: var(--accent); }

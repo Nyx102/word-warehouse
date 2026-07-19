@@ -140,14 +140,21 @@ export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyCh
     }));
     const view = new EditorView({ parent, state: EditorState.create({ doc: content, extensions: ext }) });
     viewRef.current = view;
-    if (activeRef.current) setCursorPos(cursorFromState(view.state));
+    if (activeRef.current) {
+      setCursorPos(cursorFromState(view.state));
+      view.focus();
+    }
     rewireVimMode(view);
     return () => { view.destroy(); viewRef.current = null; rewireVimMode(null); };
   }, [content, wrap, path, rewireVimMode]);
 
-  // Buffer switched to active (tab click) without a rebuild -> resync the modeline
+  // Buffer switched to active (tab click) without a rebuild -> grab focus
+  // and resync the modeline
   useEffect(() => {
-    if (active && viewRef.current) setCursorPos(cursorFromState(viewRef.current.state));
+    if (active && viewRef.current) {
+      setCursorPos(cursorFromState(viewRef.current.state));
+      viewRef.current.focus();
+    }
     rewireVimMode(viewRef.current);
   }, [active, rewireVimMode]);
 

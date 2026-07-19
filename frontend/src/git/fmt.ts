@@ -1,5 +1,11 @@
 import { fmtAge } from '../util';
-import type { GitStatusFile } from '../types';
+import type { GitStatusFile, RepoName } from '../types';
+
+/** Display name for a repo tab/header; 'corpus' is this app's own unified
+ * repo (code + corpus data), not the corpus content itself */
+export function repoLabel(repo: RepoName): string {
+  return repo === 'corpus' ? 'App' : 'Translation';
+}
 
 /** Iso date -> compact relative age for recent commits, else YYYY-MM-DD */
 export function fmtWhen(iso: string): string {

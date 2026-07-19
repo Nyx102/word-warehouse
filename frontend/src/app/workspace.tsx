@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { bufferId, bufferTitle, sanitizeDesc, type BufferDesc } from '../workspace/buffers';
+import type { RepoName } from '../types';
 
 export type RailSection = 'files' | 'search' | 'git' | 'flags' | 'chat';
 export type ChatDockState = 'hidden' | 'docked' | 'full';
@@ -27,6 +28,9 @@ interface WsState {
   sidebarCollapsed: boolean;
   chatDock: ChatDockState;
   chatWidth: number;
+  /** Repo picked in the Git section; shared so the rail can jump straight
+   * to that repo's status buffer without prop-drilling from the sidebar */
+  gitRepo: RepoName;
 }
 
 export interface WorkspaceApi extends WsState {
@@ -42,6 +46,7 @@ export interface WorkspaceApi extends WsState {
   setDrawerOpen: (v: boolean) => void;
   setChatDock: (v: ChatDockState) => void;
   setChatWidth: (px: number) => void;
+  setGitRepo: (r: RepoName) => void;
 }
 
 const STORAGE_KEY = 'ww.workspace.v1';
@@ -60,6 +65,7 @@ function restoreState(): WsState {
     sidebarCollapsed: false,
     chatDock: 'docked',
     chatWidth: 380,
+    gitRepo: 'corpus',
   };
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') as Record<string, unknown>;
@@ -83,6 +89,7 @@ function restoreState(): WsState {
     if (typeof raw.chatWidth === 'number' && Number.isFinite(raw.chatWidth)) {
       out.chatWidth = clampWidth(raw.chatWidth);
     }
+    if (raw.gitRepo === 'corpus' || raw.gitRepo === 'repo') out.gitRepo = raw.gitRepo;
   } catch { /* Corrupted -> defaults */ }
   return out;
 }
@@ -117,6 +124,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           sidebarCollapsed: state.sidebarCollapsed,
           chatDock: state.chatDock,
           chatWidth: state.chatWidth,
+          gitRepo: state.gitRepo,
         }));
       } catch { /* Storage unavailable -> layout lives for the session only */ }
     }, 300);
@@ -141,9 +149,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         : (window.matchMedia('(max-width: 767px)').matches ? 'hidden' : 'docked');
       const existing = s.buffers.find((b) => b.id === id);
       if (existing) {
-        // Re-opening a file with a target line updates the desc so deep links
-        // re-jump; identity and dirty state are untouched
-        const update = desc.kind === 'file' && desc.line != null;
+        // Re-opening a file/diff with a target line updates the desc so deep
+        // links re-jump; identity and dirty state are untouched
+        const update = (desc.kind === 'file' || desc.kind === 'diff') && desc.line != null;
         const buffers = update
           ? s.buffers.map((b) => (b.id === id ? { ...b, desc, title: bufferTitle(desc) } : b))
           : s.buffers;
@@ -214,6 +222,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return s.chatWidth === chatWidth ? s : { ...s, chatWidth };
     });
   }, []);
+  const setGitRepo = useCallback((gitRepo: RepoName) => {
+    setState((s) => (s.gitRepo === gitRepo ? s : { ...s, gitRepo }));
+  }, []);
 
   const api = useMemo<WorkspaceApi>(() => ({
     ...state,
@@ -228,8 +239,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setDrawerOpen,
     setChatDock,
     setChatWidth,
+    setGitRepo,
   }), [state, drawerOpen, open, close, activate, setDirty, setTitle, setRail,
-    setSidebarCollapsed, setChatDock, setChatWidth]);
+    setSidebarCollapsed, setChatDock, setChatWidth, setGitRepo]);
 
   return <WorkspaceContext.Provider value={api}>{children}</WorkspaceContext.Provider>;
 }

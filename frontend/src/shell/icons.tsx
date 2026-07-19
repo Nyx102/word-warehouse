@@ -123,6 +123,21 @@ export const IconFile = () => (
   </Svg>
 );
 
+export const IconHistory = () => (
+  <Svg>
+    <path d="M3 11a9 9 0 1 0 2.6-6.3" />
+    <path d="M3 4v5h5" />
+    <path d="M12 8v4l3 2" />
+  </Svg>
+);
+
+export const IconChart = () => (
+  <Svg>
+    <path d="M4 20V10M11 20V4M18 20v-7" />
+    <path d="M3 20h18" />
+  </Svg>
+);
+
 export const IconRefresh = () => (
   <Svg>
     <path d="M3 11a9 9 0 0 1 15.3-5.7L21 8" />

@@ -20,7 +20,7 @@ export function BufferArea() {
       case 'file':
         return <FileBuffer bufferId={b.id} path={d.path} line={d.line} />;
       case 'diff':
-        return <DiffBuffer repo={d.repo} path={d.path} />;
+        return <DiffBuffer repo={d.repo} path={d.path} line={d.line} />;
       case 'magit':
         return <MagitBuffer repo={d.repo} />;
       case 'log':
