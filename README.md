@@ -44,8 +44,8 @@ persisted). The sections map to the translation workflow:
    the assistant's) shows up in the status buffer's Untracked/Unstaged/Staged
    sections; expand a file inline (TAB) and stage or unstage per file or per
    hunk (s/u), then commit the staged set (c). Browsable log, commit detail,
-   per-file history, branch switch/create; both repos (corpus and the nested
-   translation repo) selectable. Single-file diff buffers open the merge
+   per-file history, branch switch/create; both repos (corpus and the translation
+   submodule) selectable. Single-file diff buffers open the merge
    editor (side-by-side on desktop, unified on mobile) with per-hunk revert.
 4. **Flags** — consistency guard while translating. It catches what
    `regex_replace.py` can't: near-miss typos of glossary terms (`Naigrart`,
@@ -116,8 +116,8 @@ phone.
 - Claude sessions: `~/.claude` (mounted into the container; cwd-keyed, so host
   and container share sessions).
 - The corpus itself is a git repo (assistant edits stay uncommitted for review
-  in the Git section); `corpus/worldend2/repo` is the translation repo with
-  its own remotes.
+  in the Git section); `corpus/worldend2/repo` is a git submodule (the translation
+  repo) with its own remotes.
 
 ## Conventions
 

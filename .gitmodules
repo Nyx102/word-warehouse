@@ -1,0 +1,3 @@
+[submodule "corpus/worldend2/repo"]
+	path = corpus/worldend2/repo
+	url = git@github.com:WorldEnd/worldend-formatting.git
