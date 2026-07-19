@@ -273,6 +273,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
       case 's': if (pointRow) stageAt(pointRow); break;
       case 'u': if (pointRow) unstageAt(pointRow); break;
       case 'g': void refetch(); break;
+      case 'l': e.preventDefault(); ws.open({ kind: 'log', repo }); break;
       case 'Enter': if (pointRow) { e.preventDefault(); visit(pointRow); } break;
       case 'c': e.preventDefault(); commitRef.current?.focus(); break;
     }
@@ -397,7 +398,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
         )}
         <span className="toolbar-spacer" />
         <span className="magit-keys dim">
-          {keymap === 'vim' ? 'j/k move' : 'n/p move'} · TAB expand · s/u stage/unstage · RET visit · c commit · g refresh
+          {keymap === 'vim' ? 'j/k move' : 'n/p move'} · TAB expand · s/u stage/unstage · RET visit · l log · c commit · g refresh
         </span>
         <button className="btn btn-sm" onClick={() => void refetch()} disabled={loading} title="Refresh (g)">
           {loading ? '…' : '↻'}
@@ -457,6 +458,9 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
               e.preventDefault();
               void doCommit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              containerRef.current?.focus();
             }
           }}
         />
@@ -470,7 +474,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
           <span className="magit-commit-hint dim">
             {stagedCount === 0
               ? 'Nothing staged—stage changes first'
-              : 'Commits the staged set · Ctrl+Enter'}
+              : 'Commits the staged set · Ctrl+Enter · Esc exits'}
           </span>
         </div>
       </div>

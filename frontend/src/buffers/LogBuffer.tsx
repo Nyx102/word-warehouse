@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+mport { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettings } from '../app/settings';
 import { useWorkspace } from '../app/workspace';
 import { fmtWhen, repoLabel } from '../git/fmt';
@@ -75,6 +75,7 @@ export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null
       case 'Enter':
         if (point !== null && entries[point]) { e.preventDefault(); openCommit(entries[point]); }
         break;
+      case 's': e.preventDefault(); ws.open({ kind: 'magit', repo }); break;
     }
   };
 
@@ -86,6 +87,9 @@ export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null
         </span>
         {path && <span className="dim">follows renames</span>}
         <span className="toolbar-spacer" />
+        <span className="magit-keys dim">
+          {keymap === 'vim' ? 'j/k move' : 'n/p move'} · RET open · s status
+        </span>
         <span className="log-repo dim">{repoLabel(repo)}</span>
       </div>
       {error && (
