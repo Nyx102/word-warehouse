@@ -187,7 +187,23 @@
 }
 button.thread-sec { text-align: left; border-radius: 6px; }
 button.thread-sec:hover { color: var(--fg); background: var(--accent-dim); }
-.sec-chev { font-size: 10px; width: 10px; flex: none; }
+/* Same disclosure chevron the git view uses (.magit-expander): points right
+ * when collapsed, rotates to point down when open. */
+.sec-chev {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 14px;
+  /* The label is all-caps, so its glyphs sit high in the line box; nudge the
+   * geometrically-centered chevron up to line up with them optically. */
+  position: relative;
+  top: -2px;
+}
+.sec-chev svg { width: 14px; height: 14px; transition: transform 0.12s ease; }
+.sec-chev.open svg { transform: rotate(90deg); }
+/* Lift the all-caps label to sit level with the chevron next to it. */
+.sec-label { position: relative; top: -1px; }
 
 .thread {
   position: relative;

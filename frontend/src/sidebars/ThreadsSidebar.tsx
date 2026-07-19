@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useWorkspace } from '../app/workspace';
+import { IconChevronRight } from '../shell/icons';
 import type { ThreadsApi } from '../chat/useThreads';
 import type { Thread, ThreadId } from '../types';
 
@@ -129,8 +130,8 @@ export function ThreadsSidebar({ threadsApi, onAfterSelect }: {
               aria-expanded={showArchived}
               onClick={() => setShowArchived((v) => !v)}
             >
-              <span className="sec-chev">{showArchived ? '▾' : '▸'}</span>
-              Archived ({archived.length})
+              <span className={'sec-chev' + (showArchived ? ' open' : '')}><IconChevronRight /></span>
+              <span className="sec-label">Archived ({archived.length})</span>
             </button>
             {showArchived && <ul className="thread-list">{archived.map(row)}</ul>}
           </>
