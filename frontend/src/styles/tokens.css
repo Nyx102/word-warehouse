@@ -53,6 +53,7 @@
   --mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   --sab: env(safe-area-inset-bottom, 0px);
   --bottom-nav-h: 52px;
+  --modeline-h: 30px;
 
   /* Tints: badge/chip fills and washes */
   --tint-blue-bg: rgba(81, 175, 239, 0.15);

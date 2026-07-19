@@ -16,7 +16,7 @@ import { json } from '@codemirror/lang-json';
 import { css } from '@codemirror/lang-css';
 import { html } from '@codemirror/lang-html';
 import { yaml } from '@codemirror/lang-yaml';
-import { Vim, vim } from '@replit/codemirror-vim';
+import { Vim, getCM, vim } from '@replit/codemirror-vim';
 import { EmacsHandler, emacs } from '@replit/codemirror-emacs';
 import { doomTheme } from './theme';
 import type { KeymapName } from '../app/settings';
@@ -78,6 +78,11 @@ export function baseExtensions({ onSave, wrap, keymap: mode }: {
   wireModalSave();
   const ext: Extension[] = [
     saveKeyExt(onSave),
+    // CodeMirror mounts same-precedence stylesheets in REVERSE encounter
+    // order, so our Prec.highest theme has to be encountered before vim's
+    // own (also Prec.highest) fat-cursor theme to win the cascade -> this
+    // must stay ahead of keymapCompartment below.
+    themeCompartment.of(doomTheme),
     // Modal plugins must precede every other keymap or they never see keys
     keymapCompartment.of(modalExt(mode)),
     ViewPlugin.define((view) => {
@@ -88,7 +93,6 @@ export function baseExtensions({ onSave, wrap, keymap: mode }: {
     highlightActiveLine(),
     drawSelection(),
     history(),
-    themeCompartment.of(doomTheme),
     highlightSelectionMatches(),
     keymap.of([
       { key: 'Mod-s', run: () => { onSave(); return true; } },
@@ -111,6 +115,21 @@ export function applyKeymap(view: EditorView, mode: KeymapName): void {
  * itself never needs this (palette flips are pure CSS). */
 export function applyEditorTheme(view: EditorView, theme: Extension): void {
   view.dispatch({ effects: themeCompartment.reconfigure(theme) });
+}
+
+/** Subscribe to a vim-mode editor's live modal state (normal/insert/visual)
+ * for the modeline. No-op (immediately reports null) outside vim mode.
+ * Returns the unsubscribe function. */
+export function wireVimModeIndicator(
+  view: EditorView,
+  onChange: (m: { mode: string; subMode?: string } | null) => void,
+): () => void {
+  const cm = getCM(view);
+  if (!cm) { onChange(null); return () => {}; }
+  const handler = (e: { mode: string; subMode?: string }) => onChange({ mode: e.mode, subMode: e.subMode });
+  cm.on('vim-mode-change', handler);
+  onChange({ mode: 'normal' });
+  return () => cm.off('vim-mode-change', handler);
 }
 
 /** Language extension chosen from the file extension; null for plaintext. */
@@ -145,5 +164,44 @@ export function languageForPath(path: string): Extension | null {
       return yaml();
     default:
       return null;
+  }
+}
+
+/** Human-readable language label for the modeline (mirrors languageForPath). */
+export function languageLabelForPath(path: string): string {
+  const p = path.toLowerCase();
+  const ext = p.slice(p.lastIndexOf('.') + 1);
+  switch (ext) {
+    case 'md':
+    case 'markdown':
+      return 'Markdown';
+    case 'py':
+      return 'Python';
+    case 'js':
+    case 'mjs':
+    case 'cjs':
+      return 'JavaScript';
+    case 'jsx':
+      return 'JSX';
+    case 'ts':
+      return 'TypeScript';
+    case 'tsx':
+      return 'TSX';
+    case 'json':
+    case 'webmanifest':
+      return 'JSON';
+    case 'css':
+      return 'CSS';
+    case 'html':
+    case 'htm':
+      return 'HTML';
+    case 'yaml':
+    case 'yml':
+      return 'YAML';
+    case 'sh':
+    case 'bash':
+      return 'Shell';
+    default:
+      return 'Text';
   }
 }

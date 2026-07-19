@@ -9,6 +9,7 @@ import { Sidebar } from '../shell/Sidebar';
 import { TabBar } from '../shell/TabBar';
 import { MobileNav } from '../shell/MobileNav';
 import { StatusSheet } from '../shell/StatusSheet';
+import { ModeLine } from '../shell/ModeLine';
 import { BufferArea } from '../workspace/BufferArea';
 import { ChatDock } from '../chat/ChatDock';
 
@@ -43,6 +44,7 @@ function Workbench() {
             <BufferArea />
             <ChatDock threadsApi={threadsApi} onTurnActiveChange={setChatBusy} />
           </div>
+          <ModeLine status={status} busy={busy} />
         </div>
       </div>
       <MobileNav busy={busy} dirty={dirty} onOpenSheet={() => setSheetOpen(true)} />

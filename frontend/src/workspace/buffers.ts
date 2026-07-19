@@ -1,3 +1,4 @@
+import { languageLabelForPath } from '../editor/cm';
 import type { RepoName } from '../types';
 
 /* Buffer descriptors for the IDE workspace. Ids derive from the desc so the
@@ -33,6 +34,42 @@ export function bufferTitle(d: BufferDesc): string {
     case 'magit': return 'magit: ' + d.repo;
     case 'log': return 'log: ' + (d.path ? basename(d.path) : d.repo);
     case 'commit': return d.rev.slice(0, 8);
+    case 'align': return 'Alignment';
+    case 'coverage': return 'Coverage';
+    case 'help': return 'Help';
+  }
+}
+
+/* The nested translation repo has its own git history; files under it map to
+ * repo 'repo' with the prefix stripped, everything else logs against 'corpus' */
+export const NESTED_REPO_PREFIX = 'corpus/worldend2/repo/';
+
+export function repoForPath(path: string): RepoName {
+  return path.startsWith(NESTED_REPO_PREFIX) ? 'repo' : 'corpus';
+}
+
+/** The repo a buffer's git state (branch/dirty) belongs to, if any. */
+export function repoForBuffer(d: BufferDesc): RepoName | null {
+  switch (d.kind) {
+    case 'file': return repoForPath(d.path);
+    case 'diff':
+    case 'magit':
+    case 'log':
+    case 'commit':
+      return d.repo;
+    default:
+      return null;
+  }
+}
+
+/** "Major mode" label for the modeline. */
+export function bufferModeLabel(d: BufferDesc): string {
+  switch (d.kind) {
+    case 'file': return languageLabelForPath(d.path);
+    case 'diff': return 'Diff';
+    case 'magit': return 'Magit';
+    case 'log': return 'Log';
+    case 'commit': return 'Commit';
     case 'align': return 'Alignment';
     case 'coverage': return 'Coverage';
     case 'help': return 'Help';

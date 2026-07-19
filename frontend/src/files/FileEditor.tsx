@@ -5,8 +5,16 @@ import { api, ApiError } from '../api';
 import { toast } from '../components/Toasts';
 import { useMediaQuery } from '../util';
 import { useSettings } from '../app/settings';
-import { applyKeymap, baseExtensions, languageForPath } from '../editor/cm';
+import { applyKeymap, baseExtensions, languageForPath, wireVimModeIndicator } from '../editor/cm';
+import { setCursorPos, type CursorPos } from '../editor/cursorStore';
+import { setVimMode } from '../editor/vimModeStore';
 import type { FileFull } from '../types';
+
+function cursorFromState(state: EditorState): CursorPos {
+  const head = state.selection.main.head;
+  const line = state.doc.lineAt(head);
+  return { line: line.number, col: head - line.from + 1 };
+}
 
 /** Breadcrumb path: the directory part shrinks with an ellipsis, the file
  * name always stays visible. */
@@ -25,9 +33,10 @@ function Crumbs({ path }: { path: string }) {
 /** Plain editable file editor for file buffers. Loads/saves via the same
  * (repo=corpus) /api/file contract the Diffs editor uses (sha256 optimistic
  * concurrency), with an optional jump-to-line for flag/search deep-links. */
-export function FileEditor({ path, gotoLine, onSaved, onClose, onDirtyChange, onHistory }: {
+export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyChange, onHistory }: {
   path: string;                  // project-relative (under FS_ROOT / ROOT)
   gotoLine?: number | null;      // 1-based line to scroll to + select on open
+  active?: boolean;               // is this the visible buffer? drives the modeline cursor readout
   onSaved?: () => void;
   onClose: () => void;
   onDirtyChange?: (dirty: boolean) => void; // drives the buffer tab dirty dot
@@ -37,6 +46,8 @@ export function FileEditor({ path, gotoLine, onSaved, onClose, onDirtyChange, on
   const { keymap: keymapMode } = useSettings();
   const keymapRef = useRef(keymapMode);
   keymapRef.current = keymapMode;
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const [content, setContent] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -49,7 +60,23 @@ export function FileEditor({ path, gotoLine, onSaved, onClose, onDirtyChange, on
   const viewRef = useRef<EditorView | null>(null);
   const savedRef = useRef('');
   const shaRef = useRef<string | null>(null);
+  const vimUnsubRef = useRef<(() => void) | null>(null);
   const dlHref = `/api/fs/download?path=${encodeURIComponent(path)}`;
+
+  // Wires/unwires the modeline's live vim-state readout. Only the instance
+  // that actually holds the wiring is allowed to clear the (global) store,
+  // so an inactive/closing buffer never clobbers a different active one's
+  // display.
+  const rewireVimMode = useCallback((view: EditorView | null) => {
+    const hadWiring = vimUnsubRef.current !== null;
+    vimUnsubRef.current?.();
+    vimUnsubRef.current = null;
+    if (view && activeRef.current && keymapRef.current === 'vim') {
+      vimUnsubRef.current = wireVimModeIndicator(view, setVimMode);
+    } else if (hadWiring) {
+      setVimMode(null);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setContent(null); setLoadErr(null); setDirty(false); setConflict(false);
@@ -109,16 +136,26 @@ export function FileEditor({ path, gotoLine, onSaved, onClose, onDirtyChange, on
     if (lang) ext.push(lang);
     ext.push(EditorView.updateListener.of((u) => {
       if (u.docChanged) setDirty(u.state.doc.toString() !== savedRef.current);
+      if (activeRef.current && (u.docChanged || u.selectionSet)) setCursorPos(cursorFromState(u.state));
     }));
     const view = new EditorView({ parent, state: EditorState.create({ doc: content, extensions: ext }) });
     viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
-  }, [content, wrap, path]);
+    if (activeRef.current) setCursorPos(cursorFromState(view.state));
+    rewireVimMode(view);
+    return () => { view.destroy(); viewRef.current = null; rewireVimMode(null); };
+  }, [content, wrap, path, rewireVimMode]);
+
+  // Buffer switched to active (tab click) without a rebuild -> resync the modeline
+  useEffect(() => {
+    if (active && viewRef.current) setCursorPos(cursorFromState(viewRef.current.state));
+    rewireVimMode(viewRef.current);
+  }, [active, rewireVimMode]);
 
   // Live keymap switch; rebuilds pick the current mode up via keymapRef
   useEffect(() => {
     if (viewRef.current) applyKeymap(viewRef.current, keymapMode);
-  }, [keymapMode]);
+    rewireVimMode(viewRef.current);
+  }, [keymapMode, rewireVimMode]);
 
   // Scroll to (and select) the requested line. Runs after the view is built
   // and again whenever a new deep-link target lands on the same open file.

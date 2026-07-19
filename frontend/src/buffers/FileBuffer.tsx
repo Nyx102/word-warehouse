@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { FileEditor } from '../files/FileEditor';
 import { useWorkspace } from '../app/workspace';
+import { NESTED_REPO_PREFIX } from '../workspace/buffers';
 
 const BINARY_EXT = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'pdf', 'zip', 'gz', 'tgz',
@@ -12,10 +13,6 @@ const BINARY_EXT = new Set([
 const isBinaryPath = (p: string) =>
   BINARY_EXT.has(p.slice(p.lastIndexOf('.') + 1).toLowerCase());
 
-/* The nested translation repo has its own git history; files under it map to
- * repo 'repo' with the prefix stripped, everything else logs against 'corpus' */
-const NESTED_REPO_PREFIX = 'corpus/worldend2/repo/';
-
 /** File buffer: the shared sha256-tracked editor, or a download stub for
  * binary files. Oversized text files hit FileEditor's own 413 fallback. */
 export function FileBuffer({ bufferId, path, line }: {
@@ -25,6 +22,7 @@ export function FileBuffer({ bufferId, path, line }: {
 }) {
   const ws = useWorkspace();
   const dlHref = `/api/fs/download?path=${encodeURIComponent(path)}`;
+  const active = ws.activeId === bufferId;
 
   const openHistory = useCallback(() => {
     if (path.startsWith(NESTED_REPO_PREFIX)) {
@@ -60,6 +58,7 @@ export function FileBuffer({ bufferId, path, line }: {
     <FileEditor
       path={path}
       gotoLine={line ?? null}
+      active={active}
       onClose={() => ws.close(bufferId)}
       onDirtyChange={setDirty}
       onHistory={openHistory}

@@ -1,4 +1,4 @@
-import { type Extension } from '@codemirror/state';
+import { Prec, type Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
@@ -18,6 +18,17 @@ const chrome = EditorView.theme({
     fontFamily: 'var(--mono)',
   },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)' },
+  // vim mode's block cursor (Prec.highest in @replit/codemirror-vim, default
+  // #ff9696); Prec.highest here + registration before the keymap compartment
+  // in baseExtensions lets this win instead. The letter color is set inline
+  // by the vim plugin's JS (to the character's own syntax color), so it
+  // needs !important to read as the on-accent contrast color instead.
+  '.cm-fat-cursor': { background: 'var(--accent)', color: 'var(--on-accent) !important' },
+  '&:not(.cm-focused) .cm-fat-cursor': {
+    background: 'none',
+    outline: 'solid 1px var(--accent)',
+    color: 'transparent !important',
+  },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
     backgroundColor: 'var(--selection)',
   },
@@ -80,4 +91,4 @@ const highlight = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--err)' },
 ]);
 
-export const doomTheme: Extension = [chrome, syntaxHighlighting(highlight)];
+export const doomTheme: Extension = [Prec.highest(chrome), syntaxHighlighting(highlight)];
