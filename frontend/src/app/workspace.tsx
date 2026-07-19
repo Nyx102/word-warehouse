@@ -28,6 +28,7 @@ interface WsState {
   sidebarCollapsed: boolean;
   chatDock: ChatDockState;
   chatWidth: number;
+  sidebarWidth: number;
   /** Repo picked in the Git section; shared so the rail can jump straight
    * to that repo's status buffer without prop-drilling from the sidebar */
   gitRepo: RepoName;
@@ -46,6 +47,7 @@ export interface WorkspaceApi extends WsState {
   setDrawerOpen: (v: boolean) => void;
   setChatDock: (v: ChatDockState) => void;
   setChatWidth: (px: number) => void;
+  setSidebarWidth: (px: number) => void;
   setGitRepo: (r: RepoName) => void;
 }
 
@@ -54,8 +56,31 @@ const MAX_BUFFERS = 12;
 const RAILS: RailSection[] = ['files', 'search', 'git', 'flags', 'chat'];
 const DOCKS: ChatDockState[] = ['hidden', 'docked', 'full'];
 
-const clampWidth = (px: number) =>
-  Math.max(280, Math.min(760, Math.round(px)));
+// Panel widths adapt to the viewport and can be dragged large, but never so
+// large that the editor (main) is squeezed below MIN_MAIN. RAIL_W is the fixed
+// rail column present at the desktop widths where dragging is enabled.
+const RAIL_W = 48;
+const MIN_MAIN = 240;
+const SIDEBAR_MIN = 220;
+const CHAT_MIN = 280;
+
+const viewportW = () => (typeof window !== 'undefined' ? window.innerWidth : 1440);
+
+// Default width that scales with screen size, capped so huge monitors don't
+// hand a panel half the window; the user can still drag past the cap.
+const scaledDefault = (frac: number, floor: number, cap: number) =>
+  Math.max(floor, Math.min(cap, Math.round(viewportW() * frac)));
+
+// `reserved` is the width the OTHER docked panel already claims, so the two
+// together can never crowd the editor below MIN_MAIN.
+const clampSidebar = (px: number, reserved: number) => {
+  const max = Math.max(SIDEBAR_MIN, viewportW() - RAIL_W - MIN_MAIN - reserved);
+  return Math.max(SIDEBAR_MIN, Math.min(max, Math.round(px)));
+};
+const clampChat = (px: number, reserved: number) => {
+  const max = Math.max(CHAT_MIN, viewportW() - RAIL_W - MIN_MAIN - reserved);
+  return Math.max(CHAT_MIN, Math.min(max, Math.round(px)));
+};
 
 function restoreState(): WsState {
   const out: WsState = {
@@ -64,7 +89,8 @@ function restoreState(): WsState {
     rail: 'files',
     sidebarCollapsed: false,
     chatDock: 'docked',
-    chatWidth: 380,
+    chatWidth: scaledDefault(0.26, 380, 560),
+    sidebarWidth: scaledDefault(0.22, 300, 440),
     gitRepo: 'corpus',
   };
   try {
@@ -86,8 +112,11 @@ function restoreState(): WsState {
     if (RAILS.includes(raw.rail as RailSection)) out.rail = raw.rail as RailSection;
     if (typeof raw.sidebarCollapsed === 'boolean') out.sidebarCollapsed = raw.sidebarCollapsed;
     if (DOCKS.includes(raw.chatDock as ChatDockState)) out.chatDock = raw.chatDock as ChatDockState;
+    if (typeof raw.sidebarWidth === 'number' && Number.isFinite(raw.sidebarWidth)) {
+      out.sidebarWidth = clampSidebar(raw.sidebarWidth, 0);
+    }
     if (typeof raw.chatWidth === 'number' && Number.isFinite(raw.chatWidth)) {
-      out.chatWidth = clampWidth(raw.chatWidth);
+      out.chatWidth = clampChat(raw.chatWidth, out.sidebarCollapsed ? 0 : out.sidebarWidth);
     }
     if (raw.gitRepo === 'corpus' || raw.gitRepo === 'repo') out.gitRepo = raw.gitRepo;
   } catch { /* Corrupted -> defaults */ }
@@ -124,6 +153,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           sidebarCollapsed: state.sidebarCollapsed,
           chatDock: state.chatDock,
           chatWidth: state.chatWidth,
+          sidebarWidth: state.sidebarWidth,
           gitRepo: state.gitRepo,
         }));
       } catch { /* Storage unavailable -> layout lives for the session only */ }
@@ -218,13 +248,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
   const setChatWidth = useCallback((px: number) => {
     setState((s) => {
-      const chatWidth = clampWidth(px);
+      const chatWidth = clampChat(px, s.sidebarCollapsed ? 0 : s.sidebarWidth);
       return s.chatWidth === chatWidth ? s : { ...s, chatWidth };
+    });
+  }, []);
+  const setSidebarWidth = useCallback((px: number) => {
+    setState((s) => {
+      const sidebarWidth = clampSidebar(px, s.chatDock === 'docked' ? s.chatWidth : 0);
+      return s.sidebarWidth === sidebarWidth ? s : { ...s, sidebarWidth };
     });
   }, []);
   const setGitRepo = useCallback((gitRepo: RepoName) => {
     setState((s) => (s.gitRepo === gitRepo ? s : { ...s, gitRepo }));
   }, []);
+
+  // Shrinking the window can leave a persisted panel wider than there's room
+  // for; re-clamp both against the new viewport so the editor is never crushed.
+  useEffect(() => {
+    const onResize = () => {
+      setSidebarWidth(stateRef.current.sidebarWidth);
+      setChatWidth(stateRef.current.chatWidth);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [setSidebarWidth, setChatWidth]);
 
   const api = useMemo<WorkspaceApi>(() => ({
     ...state,
@@ -239,9 +286,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setDrawerOpen,
     setChatDock,
     setChatWidth,
+    setSidebarWidth,
     setGitRepo,
   }), [state, drawerOpen, open, close, activate, setDirty, setTitle, setRail,
-    setSidebarCollapsed, setChatDock, setChatWidth, setGitRepo]);
+    setSidebarCollapsed, setChatDock, setChatWidth, setSidebarWidth, setGitRepo]);
 
   return <WorkspaceContext.Provider value={api}>{children}</WorkspaceContext.Provider>;
 }

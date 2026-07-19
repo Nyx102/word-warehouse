@@ -1,4 +1,6 @@
+import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { useWorkspace, type RailSection } from '../app/workspace';
+import { useMediaQuery } from '../util';
 import { FilesSidebar } from '../sidebars/FilesSidebar';
 import { SearchSidebar } from '../sidebars/SearchSidebar';
 import { GitSidebar } from '../sidebars/GitSidebar';
@@ -20,6 +22,21 @@ const LABELS: Record<RailSection, string> = {
  * so nothing remounts when the viewport crosses the breakpoint. */
 export function Sidebar({ threadsApi }: { threadsApi: ThreadsApi }) {
   const ws = useWorkspace();
+  // Drag-to-resize only applies to the inline desktop column; below 1024px the
+  // sidebar is a fixed-width overlay drawer, so the handle stays hidden there.
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const dragRef = useRef<{ startX: number; startW: number } | null>(null);
+
+  const onHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    dragRef.current = { startX: e.clientX, startW: ws.sidebarWidth };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onHandleMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (d) ws.setSidebarWidth(d.startW + (e.clientX - d.startX));
+  };
+  const onHandleUp = () => { dragRef.current = null; };
+
   const panels: { id: RailSection; body: JSX.Element }[] = [
     { id: 'files', body: <FilesSidebar /> },
     { id: 'search', body: <SearchSidebar /> },
@@ -36,8 +53,21 @@ export function Sidebar({ threadsApi }: { threadsApi: ThreadsApi }) {
         className={'ws-sidebar'
           + (ws.sidebarCollapsed ? ' collapsed' : '')
           + (ws.drawerOpen ? ' drawer-open' : '')}
+        style={isDesktop ? { width: ws.sidebarWidth } : undefined}
         aria-label={LABELS[ws.rail]}
       >
+        {isDesktop && (
+          <div
+            className="sb-handle"
+            onPointerDown={onHandleDown}
+            onPointerMove={onHandleMove}
+            onPointerUp={onHandleUp}
+            onPointerCancel={onHandleUp}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+          />
+        )}
         <div className="sb-head">
           <span className="sb-title">{LABELS[ws.rail]}</span>
           <button
