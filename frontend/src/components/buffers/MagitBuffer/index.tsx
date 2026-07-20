@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettings } from '@/context/settings';
 import { useWorkspace } from '@/context/workspace';
 import { toast } from '@/components/Toasts';
@@ -58,10 +58,17 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
     },
   });
   const git = useGitMutations(repo);
+  const qc = useQueryClient();
   const data = q.data ?? null;
   const loading = q.isFetching;
   const error = q.error ? q.error.message : null;
-  const refetch = q.refetch;
+  // Refresh the whole ['git', repo] prefix, not just this buffer's snapshot,
+  // so the Git sidebar's separate status/branches queries refetch in lockstep
+  // — the same invalidation every git mutation already fires.
+  const refresh = useCallback(
+    () => qc.invalidateQueries({ queryKey: gitKeys.all(repo) }),
+    [qc, repo],
+  );
 
   const files = data?.status.files ?? [];
   const untrackedFiles = files.filter((f) => f.untracked);
@@ -100,7 +107,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
 
   // Re-poll whenever the buffer becomes the active tab
   const active = ws.activeId === 'magit:' + repo;
-  useEffect(() => { if (active) void refetch(); }, [active, refetch]);
+  useEffect(() => { if (active) void refresh(); }, [active, refresh]);
   // Buffers stay mounted (CSS-hidden) across tab switches, so keyboard nav
   // (n/p/j/k, TAB to expand) only works if we grab focus on activation;
   // otherwise the first keypress after switching tabs falls through to
@@ -205,7 +212,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
         break;
       case 's': if (pointRow) stageAt(pointRow); break;
       case 'u': if (pointRow) unstageAt(pointRow); break;
-      case 'g': void refetch(); break;
+      case 'g': void refresh(); break;
       case 'l': e.preventDefault(); ws.open({ kind: 'log', repo }); break;
       case 'Enter': if (pointRow) { e.preventDefault(); visit(pointRow); } break;
       case 'c': e.preventDefault(); commitRef.current?.focus(); break;
@@ -242,7 +249,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
         </span>
         <button
           className={'icon-btn magit-refresh' + (loading ? ' loading' : '')}
-          onClick={() => void refetch()}
+          onClick={() => void refresh()}
           disabled={loading}
           title="Refresh (g)"
           aria-label="Refresh"
@@ -250,7 +257,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
       </div>
       {error && (
         <div className="magit-error">
-          {error} <button className="btn btn-sm" onClick={() => void refetch()}>Retry</button>
+          {error} <button className="btn btn-sm" onClick={() => void refresh()}>Retry</button>
         </div>
       )}
       {!data && !error && <div className="empty">Loading…</div>}
