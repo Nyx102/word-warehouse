@@ -8,6 +8,7 @@ import { useSettings } from '@/context/settings';
 import { applyKeymap, baseExtensions, cursorFromState, flashLine, languageForPath, wireVimModeIndicator } from '@/features/editor/cm';
 import { setCursorPos } from '@/features/editor/cursorStore';
 import { setVimMode } from '@/features/editor/vimModeStore';
+import { IconClose, IconDownload, IconHistory, IconRefresh, IconSave, IconWrap } from '@/components/layout/icons';
 import type { FileFull } from '@/lib/types';
 
 /** Breadcrumb path: the directory part shrinks with an ellipsis, the file
@@ -171,21 +172,23 @@ export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyCh
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         <span className="toolbar-spacer" />
         <button
-          className={'btn btn-sm' + (wrap ? ' toggled' : '')}
+          className={'tb-btn' + (wrap ? ' toggled' : '')}
           onClick={() => setWrapOverride(!wrap)}
           title="Toggle line wrapping"
-        >Wrap</button>
+          aria-label="Toggle line wrapping"
+        ><IconWrap /></button>
         {onHistory && (
-          <button className="btn btn-sm" onClick={onHistory} title="File history">History</button>
+          <button className="tb-btn" onClick={onHistory} title="File history" aria-label="File history"><IconHistory /></button>
         )}
-        <a className="btn btn-sm" href={dlHref} title="Download this file">Download</a>
+        <a className="tb-btn" href={dlHref} title="Download this file" aria-label="Download this file"><IconDownload /></a>
         <button
-          className="btn btn-sm primary"
+          className={'tb-btn save' + (saving ? ' saving' : '')}
           onClick={() => void save()}
           disabled={content == null || saving || !dirty}
-          title="Save (Ctrl/Cmd+S)"
-        >{saving ? 'Saving…' : 'Save'}</button>
-        <button className="btn btn-sm" onClick={onClose} title="Close editor">Close</button>
+          title={saving ? 'Saving…' : 'Save (Ctrl/Cmd+S)'}
+          aria-label="Save"
+        >{saving ? <IconRefresh /> : <IconSave />}</button>
+        <button className="tb-btn" onClick={onClose} title="Close editor" aria-label="Close editor"><IconClose /></button>
       </div>
       {conflict && (
         <div className="conflict-bar">

@@ -185,3 +185,34 @@ export const IconCheck = () => (
     <path d="M5 12.5l4.5 4.5L19 7" />
   </Svg>
 );
+
+export const IconSave = () => (
+  <Svg>
+    <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+    <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" />
+    <path d="M7 3v4a1 1 0 0 0 1 1h6" />
+  </Svg>
+);
+
+export const IconDownload = () => (
+  <Svg>
+    <path d="M12 4v12" />
+    <path d="M7 11l5 5 5-5" />
+    <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+  </Svg>
+);
+
+export const IconWrap = () => (
+  <Svg>
+    <path d="M3 6h18" />
+    <path d="M3 12h15a3 3 0 0 1 0 6h-5" />
+    <path d="M16 16l-2 2 2 2" />
+    <path d="M3 18h6" />
+  </Svg>
+);
+
+export const IconClose = () => (
+  <Svg>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Svg>
+);

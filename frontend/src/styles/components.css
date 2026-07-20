@@ -33,6 +33,32 @@
 }
 .icon-btn:hover { color: var(--fg); background: var(--accent-dim); }
 
+/* Toolbar icon-button: ghost square that fills on hover, sized for the
+ * editor/status chrome. Save variant lights up while there's work to do. */
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-dim);
+  flex: none;
+}
+.tb-btn svg { width: 17px; height: 17px; display: block; }
+.tb-btn:hover:not(:disabled) { color: var(--fg); background: var(--accent-dim); }
+.tb-btn:disabled { opacity: 0.4; }
+.tb-btn.toggled { color: var(--accent); background: var(--accent-dim); }
+.tb-btn.save:not(:disabled) { color: var(--accent); }
+.tb-btn.save:not(:disabled):hover { color: var(--on-accent); background: var(--accent); }
+.tb-btn.saving svg { animation: spin 0.9s linear infinite; }
+@media (max-width: 767px) {
+  .tb-btn { width: 38px; height: 38px; }
+  .tb-btn svg { width: 19px; height: 19px; }
+}
+
 .field-box {
   display: flex;
   flex-direction: column;

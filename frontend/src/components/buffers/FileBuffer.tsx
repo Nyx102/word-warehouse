@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { FileEditor } from '@/features/files/FileEditor';
 import { useWorkspace } from '@/context/workspace';
+import { IconClose, IconDownload, IconHistory } from '@/components/layout/icons';
 import { NESTED_REPO_PREFIX } from './buffers';
 
 const BINARY_EXT = new Set([
@@ -43,9 +44,9 @@ export function FileBuffer({ bufferId, path, line }: {
         <div className="editor-toolbar">
           <span className="editor-path mono" title={path}>{path}</span>
           <span className="toolbar-spacer" />
-          <button className="btn btn-sm" onClick={openHistory} title="File history">History</button>
-          <a className="btn btn-sm" href={dlHref}>Download</a>
-          <button className="btn btn-sm" onClick={() => ws.close(bufferId)}>Close</button>
+          <button className="tb-btn" onClick={openHistory} title="File history" aria-label="File history"><IconHistory /></button>
+          <a className="tb-btn" href={dlHref} title="Download this file" aria-label="Download this file"><IconDownload /></a>
+          <button className="tb-btn" onClick={() => ws.close(bufferId)} title="Close editor" aria-label="Close editor"><IconClose /></button>
         </div>
         <div className="empty pad">
           Binary file—not editable here. <a href={dlHref}>Download</a> instead.
