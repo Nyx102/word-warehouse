@@ -164,6 +164,7 @@
 .ml-git-dirty {
   color: var(--warn);
   font-weight: 600;
+  margin-left: 3px;
 }
 
 .ww-select.ml-keymap {

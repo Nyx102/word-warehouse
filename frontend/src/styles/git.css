@@ -100,6 +100,11 @@
   border-radius: 4px;
   padding: 0 5px;
 }
+.magit-ab-n {
+  margin-left: 3px;
+  position: relative;
+  top: 1px;
+}
 .magit-keys { font-size: 11px; }
 .magit-refresh { flex: none; margin-left: -4px; margin-right: -6px; }
 .magit-refresh svg { width: 16px; height: 16px; display: block; }

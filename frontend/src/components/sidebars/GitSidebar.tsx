@@ -135,7 +135,7 @@ export function GitSidebar() {
           />
           {b && b.ahead != null && (b.ahead > 0 || (b.behind ?? 0) > 0) && (
             <span className="magit-ab" title={`ahead ${b.ahead}, behind ${b.behind}`}>
-              ↑{b.ahead} ↓{b.behind}
+              ↑<span className="magit-ab-n">{b.ahead}</span> ↓<span className="magit-ab-n">{b.behind}</span>
             </span>
           )}
           <button
