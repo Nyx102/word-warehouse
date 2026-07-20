@@ -40,6 +40,7 @@ _DIST = ROOT / "frontend" / "dist"
 STATIC = _DIST if _DIST.is_dir() else ROOT / "static"
 POLL_INTERVAL = 5
 MAX_BODY = 64 * 1024 * 1024  # Reject oversize request bodies (uploads) up front
+MAX_EDIT_BYTES = 16 * 1024 * 1024  # Largest file the editor will open or save
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
         ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
@@ -184,6 +185,12 @@ def align(request: Request):
         _q(request, "series") or None, _q(request, "volume") or None))
 
 
+def _looks_binary(f: Path) -> bool:
+    """Git's heuristic: a NUL byte in the first 8 KB means the file is binary."""
+    with f.open("rb") as fh:
+        return b"\x00" in fh.read(8192)
+
+
 @app.get("/api/file")
 def file(request: Request):
     rel = _q(request, "path", "")
@@ -192,7 +199,9 @@ def file(request: Request):
     if f is None or not f.is_file():
         raise HTTPException(404, "not found")
     if _q(request, "full"):
-        if f.stat().st_size > 2 * 1024 * 1024:
+        if _looks_binary(f):
+            raise HTTPException(415, "This file is binary. Download it instead.")
+        if f.stat().st_size > MAX_EDIT_BYTES:
             raise HTTPException(413, "file too large for editor")
         content = f.read_text(encoding="utf-8", errors="replace")
         return dict(
@@ -214,8 +223,10 @@ def file_put(body: dict = Depends(json_body)):
     if f is None:
         raise HTTPException(400, "bad path")
     content = body.get("content")
-    if content is None or len(content) > 5 * 1024 * 1024:
-        raise HTTPException(400, "missing or oversized content")
+    if content is None:
+        raise HTTPException(400, "missing content")
+    if len(content.encode("utf-8")) > MAX_EDIT_BYTES:
+        raise HTTPException(413, "content too large for editor")
     expect = body.get("expect_sha256")
     if expect and f.is_file():
         cur = hashlib.sha256(f.read_bytes()).hexdigest()
