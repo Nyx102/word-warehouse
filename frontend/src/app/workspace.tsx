@@ -65,7 +65,9 @@ const DOCKS: ChatDockState[] = ['hidden', 'docked', 'full'];
 const RAIL_W = 48;
 const MIN_MAIN = 240;
 const SIDEBAR_MIN = 220;
-const CHAT_MIN = 280;
+// Narrowest the chat dock can be dragged: the model-picker header at its natural
+// width plus the .chat-head side padding (6px each) and the dock's left border.
+const CHAT_MIN = 272;
 
 const viewportW = () => (typeof window !== 'undefined' ? window.innerWidth : 1440);
 
