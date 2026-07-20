@@ -26,6 +26,7 @@
   flex: none;
   flex-wrap: wrap;
 }
+.chat-head .model-picker { margin-left: auto; }
 .drawer-btn { display: none; }
 @media (max-width: 1023px) {
   /* Docked panels are narrow here; threads open as an in-panel drawer */

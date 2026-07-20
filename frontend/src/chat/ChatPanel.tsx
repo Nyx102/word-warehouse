@@ -63,7 +63,6 @@ export function ChatPanel({ threadsApi, onTurnActiveChange }: {
         <button className="btn btn-sm drawer-btn" onClick={() => setDrawerOpen(true)} title="Threads">
           ☰ Threads
         </button>
-        <span className="toolbar-spacer" />
         <ModelPicker value={modelValue} disabled={stream.turnActive} onChange={changeModel} />
       </div>
       <MessageList
