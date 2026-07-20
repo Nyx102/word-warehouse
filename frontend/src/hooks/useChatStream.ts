@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../api';
-import { toast } from '../components/Toasts';
-import type { ChatEventPayload, ThreadId, ThreadMessage } from '../types';
+import { api } from '@/lib/api';
+import { toast } from '@/components/Toasts';
+import type { ChatEventPayload, ThreadId, ThreadMessage } from '@/lib/types';
 
 /* Renderable chat items, produced by folding the event stream.
  * Ported from app/static/app.js: replay-then-stream, (turn,seq) dedupe,

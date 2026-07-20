@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type KeyboardEvent } from 'react';
-import { useSettings } from '../app/settings';
+import { useSettings } from '@/context/settings';
 
 /** Keyboard scrolling for read-only content that isn't line-structured text
  * (rendered markdown, the alignment matrix) — so there's no text cursor, but

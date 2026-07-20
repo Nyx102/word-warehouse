@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../api';
-import type { StatusInfo } from '../types';
+import { api } from '@/lib/api';
+import type { StatusInfo } from '@/lib/types';
 
 /** Poll /api/status every 10s; pauses while the browser tab is hidden. */
 export function useStatus(): { status: StatusInfo | null; refresh: () => void } {
