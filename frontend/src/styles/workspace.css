@@ -38,27 +38,44 @@
   display: flex;
   overflow-x: auto;
   min-width: 0;
+  scrollbar-width: none;      /* Firefox: scroll by wheel/trackpad, no bar */
+  -ms-overflow-style: none;   /* legacy Edge */
 }
+.tabs-scroll::-webkit-scrollbar { display: none; }  /* WebKit */
 .tab {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 6px 0 12px;
+  gap: 7px;
+  padding: 0 8px 0 12px;
   border-right: 1px solid var(--border);
   color: var(--fg-dim);
   cursor: pointer;
   white-space: nowrap;
   font-size: 12.5px;
+  line-height: 1;
   max-width: 220px;
   flex: none;
+  user-select: none;
 }
 .tab:hover { color: var(--fg); background: var(--accent-dim); }
-.tab.active {
-  color: var(--fg);
-  background: var(--bg);
-  box-shadow: inset 0 2px 0 var(--accent);
+.tab.active { color: var(--fg); background: var(--bg); }
+/* Active marker sits flush over the tabbar's bottom border, so the label stays
+   dead-centered (a top inset bar would visually push the text down). */
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
 }
 .tab-title { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Trailing area: dirty dot plus a close button whose 18px box is always
+   reserved, so revealing it on hover never shifts the layout. */
+.tab-tail { display: flex; align-items: center; gap: 5px; flex: none; }
 .tab-dirty {
   width: 8px;
   height: 8px;
@@ -67,14 +84,25 @@
   flex: none;
 }
 .tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
   color: var(--fg-dim);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
-  padding: 2px 5px;
   border-radius: 4px;
   flex: none;
 }
 .tab-close:hover { color: var(--err); background: var(--tint-red-bg); }
+/* Pointer devices: keep the strip calm — close appears on hover or when active.
+   Touch devices (no hover) keep every close button tappable. */
+@media (hover: hover) {
+  .tab-close { opacity: 0; }
+  .tab:hover .tab-close,
+  .tab.active .tab-close { opacity: 1; }
+}
 .tabbar-empty {
   align-self: center;
   padding: 0 12px;

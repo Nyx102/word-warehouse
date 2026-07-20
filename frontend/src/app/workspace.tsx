@@ -39,6 +39,9 @@ export interface WorkspaceApi extends WsState {
   drawerOpen: boolean;
   open: (desc: BufferDesc) => void;
   close: (id: string) => void;
+  /** Close a batch (context-menu "close others/right/all"); one confirm covers
+   * any unsaved buffers in the set. */
+  closeMany: (ids: string[]) => void;
   activate: (id: string) => void;
   setDirty: (id: string, dirty: boolean) => void;
   setTitle: (id: string, title: string) => void;
@@ -221,6 +224,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const closeMany = useCallback((ids: string[]) => {
+    const kill = new Set(ids);
+    const targets = stateRef.current.buffers.filter((b) => kill.has(b.id));
+    if (!targets.length) return;
+    const dirty = targets.filter((b) => b.dirty);
+    if (dirty.length && !window.confirm(
+      `Close ${targets.length} buffers? Unsaved changes in ${dirty.map((b) => b.title).join(', ')} will be lost.`,
+    )) return;
+    setState((s) => {
+      const buffers = s.buffers.filter((b) => !kill.has(b.id));
+      let activeId = s.activeId;
+      if (activeId != null && kill.has(activeId)) {
+        const order = lruRef.current;
+        activeId = buffers
+          .map((b) => b.id)
+          .sort((a, b) => order.indexOf(a) - order.indexOf(b))
+          .pop() ?? null;
+      }
+      return { ...s, buffers, activeId };
+    });
+  }, []);
+
   const setDirty = useCallback((id: string, dirty: boolean) => {
     setState((s) => {
       const b = s.buffers.find((x) => x.id === id);
@@ -278,6 +303,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     drawerOpen,
     open,
     close,
+    closeMany,
     activate,
     setDirty,
     setTitle,
@@ -288,7 +314,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setChatWidth,
     setSidebarWidth,
     setGitRepo,
-  }), [state, drawerOpen, open, close, activate, setDirty, setTitle, setRail,
+  }), [state, drawerOpen, open, close, closeMany, activate, setDirty, setTitle, setRail,
     setSidebarCollapsed, setChatDock, setChatWidth, setSidebarWidth, setGitRepo]);
 
   return <WorkspaceContext.Provider value={api}>{children}</WorkspaceContext.Provider>;

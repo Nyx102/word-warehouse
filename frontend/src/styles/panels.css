@@ -265,6 +265,13 @@
 .ctx-item:hover { background: var(--accent-dim); color: var(--fg); }
 .ctx-item.danger { color: var(--err); }
 .ctx-item.danger:hover { background: var(--tint-red-bg); }
+.ctx-key { float: right; margin-left: 18px; color: var(--fg-dim); font-size: 11px; }
+
+/* Tab overflow menu: the full list of open buffers, jump to any */
+.tab-list { min-width: 200px; max-width: 340px; max-height: 60vh; overflow-y: auto; }
+.tab-list-item { display: flex; align-items: center; gap: 8px; }
+.tab-list-item.active { background: var(--accent-dim); color: var(--fg); }
+.tab-list-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 /* File buffer toolbar bits */
 .fb-crumbs {
