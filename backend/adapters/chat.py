@@ -28,6 +28,18 @@ SYSTEM_BLURB = (
     " numbers so the user can jump to them."
 )
 
+# Permissions ride on explicit flags: headless mode does not honor a project
+# .claude/settings.json in a directory without interactive trust.
+ALLOWED_TOOLS = ["Read", "Edit", "Write", "Grep", "Glob", "WebSearch",
+                 "WebFetch", "Bash(corpus:*)", "Bash(git status:*)",
+                 "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)",
+                 "Bash(ls:*)", "Bash(wc:*)", "Bash(head:*)", "Bash(tail:*)",
+                 "Bash(grep:*)", "Bash(rg:*)", "Bash(find:*)", "Bash(diff:*)",
+                 "Bash(python3:*)"]
+DENIED_TOOLS = ["Bash(git commit:*)", "Bash(git push:*)", "Bash(git reset:*)",
+                "Bash(git checkout:*)", "Bash(git restore:*)", "Bash(rm:*)",
+                "Bash(sudo:*)"]
+
 _global_turns = threading.Semaphore(MAX_GLOBAL_TURNS)
 
 
@@ -134,6 +146,50 @@ def _emit(turn, conn, kind, **payload):
     turn.publish(payload)
 
 
+def _build_argv(text, session_id, model):
+    argv = [CLAUDE_BIN, "-p", text,
+            "--output-format", "stream-json",
+            "--verbose",
+            "--include-partial-messages",
+            "--permission-mode", "acceptEdits",
+            "--allowedTools", ",".join(ALLOWED_TOOLS),
+            "--disallowedTools", ",".join(DENIED_TOOLS),
+            "--add-dir", str(DATA),
+            "--append-system-prompt", SYSTEM_BLURB]
+    if model != "default":
+        argv += ["--model", model]
+    if session_id:
+        argv += ["--resume", session_id]
+    return argv
+
+
+def _attempt(turn, conn, text, session_id, model):
+    """Run one claude invocation to completion, streaming its events. Returns
+    (returncode, stderr_tail); stderr is only read on failure."""
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("CLAUDECODE", "CLAUDE_CODE"))}
+    turn.proc = subprocess.Popen(
+        _build_argv(text, session_id, model), cwd=str(CORPUS), env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+    killer = threading.Timer(TURN_TIMEOUT, _kill, args=(turn, "timeout"))
+    killer.daemon = True
+    killer.start()
+    try:
+        _pump(turn, conn)
+        turn.proc.wait()
+    finally:
+        killer.cancel()
+    rc = turn.proc.returncode
+    err = "" if rc in (0, None) else (turn.proc.stderr.read() or "")[:800]
+    return rc, err
+
+
+def _missing_session(rc, err):
+    """A --resume against a session the CLI can't find (never persisted, or
+    dropped) exits fast with this message. Distinct from a real turn failure."""
+    return rc not in (0, None) and "No conversation found with session ID" in err
+
+
 def _run_turn(turn, text):
     _global_turns.acquire()
     conn = connect()
@@ -146,44 +202,18 @@ def _run_turn(turn, text):
         # explicitly opts back into the CLI default.
         model = (row["model"] if row and row["model"] else "sonnet")
 
-        # Permissions ride on explicit flags: headless mode does not honor a
-        # project .claude/settings.json in a directory without interactive trust
-        allowed = ["Read", "Edit", "Write", "Grep", "Glob", "WebSearch",
-                   "WebFetch", "Bash(corpus:*)", "Bash(git status:*)",
-                   "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)",
-                   "Bash(ls:*)", "Bash(wc:*)", "Bash(head:*)", "Bash(tail:*)",
-                   "Bash(grep:*)", "Bash(rg:*)", "Bash(find:*)", "Bash(diff:*)",
-                   "Bash(python3:*)"]
-        denied = ["Bash(git commit:*)", "Bash(git push:*)", "Bash(git reset:*)",
-                  "Bash(git checkout:*)", "Bash(git restore:*)", "Bash(rm:*)",
-                  "Bash(sudo:*)"]
-        argv = [CLAUDE_BIN, "-p", text,
-                "--output-format", "stream-json",
-                "--verbose",
-                "--include-partial-messages",
-                "--permission-mode", "acceptEdits",
-                "--allowedTools", ",".join(allowed),
-                "--disallowedTools", ",".join(denied),
-                "--add-dir", str(DATA),
-                "--append-system-prompt", SYSTEM_BLURB]
-        if model != "default":
-            argv += ["--model", model]
-        if session_id:
-            argv += ["--resume", session_id]
-
-        env = {k: v for k, v in os.environ.items()
-               if not k.startswith(("CLAUDECODE", "CLAUDE_CODE"))}
-        turn.proc = subprocess.Popen(
-            argv, cwd=str(CORPUS), env=env, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, bufsize=1)
-
-        killer = threading.Timer(TURN_TIMEOUT, _kill, args=(turn, "timeout"))
-        killer.daemon = True
-        killer.start()
-        try:
-            _pump(turn, conn)
-        finally:
-            killer.cancel()
+        rc, err = _attempt(turn, conn, text, session_id, model)
+        # The stored session may point at a transcript the CLI can't find (it
+        # was never persisted, or was pruned). Resuming it fails fast before any
+        # output, so clear the dead id and retry once as a fresh session rather
+        # than erroring on every follow-up message.
+        if session_id and _missing_session(rc, err):
+            conn.execute("UPDATE threads SET claude_session_id=NULL WHERE id=?",
+                         (turn.thread_id,))
+            conn.commit()
+            rc, err = _attempt(turn, conn, text, None, model)
+        if rc not in (0, None):
+            _emit(turn, conn, "error", message=f"claude exited {rc}: {err}")
     except Exception as e:
         _emit(turn, conn, "error", message=str(e))
     finally:
@@ -281,12 +311,8 @@ def _pump(turn, conn):
                   ok=(ev.get("subtype") == "success"),
                   duration_s=round((ev.get("duration_ms") or 0) / 1000, 1),
                   session_id=sid)
-
-    turn.proc.wait()
-    if turn.proc.returncode not in (0, None):
-        err = (turn.proc.stderr.read() or "")[:800]
-        _emit(turn, conn, "error",
-              message=f"claude exited {turn.proc.returncode}: {err}")
+    # Exit status and stderr are handled by the caller (_attempt), which decides
+    # whether a nonzero exit is a resume-miss worth retrying or a real error.
 
 
 def interrupt(thread_id):
