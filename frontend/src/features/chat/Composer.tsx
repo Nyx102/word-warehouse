@@ -1,34 +1,26 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
+import { IconSend, IconStop } from '../../components/layout/icons';
+import { useAutoGrow } from '../../hooks/useAutoGrow';
+import { ModelPicker } from './ModelPicker';
+import type { ModelName } from '@/lib/types';
 
-const MAX_ROWS = 6;
+const MAX_ROWS = 10;
 
-/** Sticky message composer: one flex row on the --ctl-h grid. Enter sends,
- * Shift+Enter inserts a newline, Ctrl/Cmd+Enter also sends; never sends
- * mid-IME-composition. The textarea auto-grows from one row (exactly --ctl-h
- * tall, so the button sits centered against it) to MAX_ROWS, then scrolls;
- * Stop replaces Send while a turn is running. */
-export function Composer({ turnActive, onSend, onStop }: {
+/** Message composer, standard LLM-composer shape: the textarea on top with a
+ * control bar underneath (model picker on the left, Send on the right). Enter
+ * sends, Shift+Enter inserts a newline, Ctrl/Cmd+Enter also sends; never sends
+ * mid-IME-composition. The textarea auto-grows to MAX_ROWS then scrolls (its
+ * scrollbar hidden); Stop replaces Send while a turn is running. */
+export function Composer({ turnActive, model, onModelChange, onSend, onStop }: {
   turnActive: boolean;
+  model: ModelName;
+  onModelChange: (m: ModelName) => void;
   onSend: (text: string) => void;
   onStop: () => void;
 }) {
   const [text, setText] = useState('');
   const taRef = useRef<HTMLTextAreaElement>(null);
-
-  useLayoutEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    const cs = window.getComputedStyle(ta);
-    const lh = parseFloat(cs.lineHeight) || 20;
-    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-    const max = Math.round(lh * MAX_ROWS + pad + border);
-    // Collapse first so scrollHeight reports the real content height
-    ta.style.height = 'auto';
-    const want = ta.scrollHeight + border;
-    ta.style.height = Math.min(Math.max(want, lh + pad + border), max) + 'px';
-    ta.style.overflowY = want > max ? 'auto' : 'hidden';
-  }, [text]);
+  useAutoGrow(taRef, text, MAX_ROWS);
 
   const submit = () => {
     const t = text.trim();
@@ -48,21 +40,34 @@ export function Composer({ turnActive, onSend, onStop }: {
 
   return (
     <div className="composer">
-      <textarea
-        ref={taRef}
-        rows={1}
-        value={text}
-        placeholder="Message…  (Enter to send, Shift+Enter for newline)"
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKeyDown}
-      />
-      {turnActive ? (
-        <button className="btn danger composer-btn" onClick={onStop}>Stop</button>
-      ) : (
-        <button className="btn primary composer-btn" onClick={submit} disabled={!text.trim()}>
-          Send
-        </button>
-      )}
+      <div className="field-box">
+        <textarea
+          ref={taRef}
+          rows={1}
+          value={text}
+          placeholder="Message…"
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        <div className="field-bar">
+          <ModelPicker value={model} disabled={turnActive} onChange={onModelChange} />
+          {turnActive ? (
+            <button className="field-send stop" onClick={onStop} aria-label="Stop generating" title="Stop">
+              <IconStop />
+            </button>
+          ) : (
+            <button
+              className="field-send"
+              onClick={submit}
+              disabled={!text.trim()}
+              aria-label="Send message"
+              title="Send · Enter"
+            >
+              <IconSend />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -214,24 +214,13 @@
   border-top: 1px solid var(--border);
   background: var(--bg-alt);
   padding: 10px 14px calc(10px + var(--sab));
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
-.magit-msg {
-  width: 100%;
-  resize: vertical;
-  min-height: 56px;
-  font-size: 13px;
-  background: var(--panel);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 8px 10px;
-}
-.magit-msg:focus { outline: none; border-color: var(--accent); }
-.magit-commit-actions { display: flex; align-items: center; gap: 10px; }
-.magit-commit-hint { font-size: 11.5px; }
+/* Skin/sizing come from the shared .field-box rules; commit body just runs a
+ * slightly smaller mono face. The staged hint sits in the control bar and
+ * truncates rather than pushing the commit button off the row. */
+.magit-msg { font-size: 13px; }
+/* margin-right:auto keeps the hint left and the commit button right in the bar. */
+.magit-commit-hint { font-size: 11.5px; margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- log buffer ---- */
 

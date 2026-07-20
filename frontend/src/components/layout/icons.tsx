@@ -166,3 +166,22 @@ export const IconRefresh = () => (
     <path d="M3 20v-4h4" />
   </Svg>
 );
+
+export const IconSend = () => (
+  <Svg>
+    <path d="M12 19V6" />
+    <path d="M6 12l6-6 6 6" />
+  </Svg>
+);
+
+export const IconStop = () => (
+  <Svg>
+    <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconCheck = () => (
+  <Svg>
+    <path d="M5 12.5l4.5 4.5L19 7" />
+  </Svg>
+);

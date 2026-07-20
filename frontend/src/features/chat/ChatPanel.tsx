@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useChatStream } from '@/hooks/useChatStream';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
-import { ModelPicker } from './ModelPicker';
 import { ThreadsSidebar } from '@/components/sidebars/ThreadsSidebar';
 import { useThreadsContext } from '@/context/threads';
 import { useThreadMutations } from './useThreadMutations';
@@ -65,14 +64,19 @@ export function ChatPanel({ onTurnActiveChange }: {
         <button className="btn btn-sm drawer-btn" onClick={() => setDrawerOpen(true)} title="Threads">
           ☰ Threads
         </button>
-        <ModelPicker value={modelValue} disabled={stream.turnActive} onChange={changeModel} />
       </div>
       <MessageList
         key={String(threads.selectedId ?? 'none')}
         items={stream.items}
         thinking={stream.thinking}
       />
-      <Composer turnActive={stream.turnActive} onSend={(t) => void handleSend(t)} onStop={stream.stop} />
+      <Composer
+        turnActive={stream.turnActive}
+        model={modelValue}
+        onModelChange={changeModel}
+        onSend={(t) => void handleSend(t)}
+        onStop={stream.stop}
+      />
       {drawerOpen && (
         <div
           className="drawer-backdrop"

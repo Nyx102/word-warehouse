@@ -16,8 +16,10 @@
   white-space: nowrap;
 }
 
+/* The model picker now lives in the composer bar, so the head only carries the
+ * mobile drawer button — hidden entirely until the narrow breakpoint. */
 .chat-head {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 10px;
   padding: 6px;
@@ -26,10 +28,10 @@
   flex: none;
   flex-wrap: wrap;
 }
-.chat-head .model-picker { margin-left: auto; }
 .drawer-btn { display: none; }
 @media (max-width: 1023px) {
   /* Docked panels are narrow here; threads open as an in-panel drawer */
+  .chat-head { display: flex; }
   .drawer-btn { display: inline-flex; }
 }
 
@@ -133,35 +135,50 @@
   z-index: 5;
 }
 
-/* Composer: one flex row; the textarea's single-row height equals --ctl-h so
- * the bottom-anchored button reads as centered until the text grows */
+/* Composer: a single themed field (.field-box) with the send/stop icon in its
+ * bottom-right gutter; sizing/skin come from the shared .field-box rules. */
 .composer {
   flex: none;
   position: sticky;
   bottom: 0;
   display: flex;
-  align-items: stretch;
-  gap: 8px;
   padding: 10px 12px calc(10px + var(--sab));
   border-top: 1px solid var(--border);
   background: var(--bg-alt);
 }
-.composer textarea {
-  flex: 1;
-  min-width: 0;
-  resize: none;
-  min-height: var(--ctl-h);
-  height: var(--ctl-h);
-  line-height: 20px;
-  padding: 5px 10px;
-  overflow-y: hidden;
+.composer .field-box { flex: 1; }
+/* Chat bar has no left-anchored content, so pack the model dropdown and send
+ * together on the right. */
+.composer .field-bar { justify-content: flex-end; }
+
+/* Model dropdown in the composer bar: native select with our own caret (the
+ * browser arrow is suppressed via appearance:none), matching the git branch
+ * picker pattern. Sized to sit level with the 28px send button. */
+.model-select-wrap { position: relative; display: inline-flex; }
+.model-select {
+  height: 28px;
+  background: var(--raise);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 26px 0 10px;
+  font-size: 12.5px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
-.composer-btn {
-  align-self: flex-end;
-  height: var(--ctl-h);
-  min-width: 68px;
-  flex: none;
+.model-select:hover:not(:disabled) { border-color: var(--accent); }
+.model-select:disabled { color: var(--fg-dim); }
+.model-caret {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg-dim);
+  pointer-events: none;
+  display: flex;
 }
+.model-caret svg { width: 13px; height: 13px; }
 
 /* Thread manager (sidebar section and in-panel drawer) */
 .thread-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }

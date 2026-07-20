@@ -14,7 +14,8 @@ import {
 } from '@/features/git/gitApi';
 import { gitKeys } from '@/features/git/gitKeys';
 import { useGitMutations } from '@/features/git/useGitMutations';
-import { IconRefresh } from '@/components/layout/icons';
+import { useAutoGrow } from '@/hooks/useAutoGrow';
+import { IconRefresh, IconCheck } from '@/components/layout/icons';
 import type { GitStatusFile, RepoName } from '@/lib/types';
 import { CommitRow } from './CommitRow';
 import { Section } from './Section';
@@ -22,6 +23,7 @@ import { useRovingPoint } from './useRovingPoint';
 import type { Data, Row, RowRenderCtx } from './types';
 
 const byPath = (files: DiffFile[]) => new Map(files.map((f) => [f.path, f]));
+const COMMIT_MAX_ROWS = 12;
 
 /** Magit-style status buffer: sections for untracked/unstaged/staged files
  * with inline expandable hunks, recent commits, and a commit editor for the
@@ -33,6 +35,7 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const commitRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(commitRef, msg, COMMIT_MAX_ROWS);
 
   // One composite key holds the atomic 4-way snapshot; react-query's own
   // request bookkeeping replaces the old seqRef out-of-order guard. Any git
@@ -269,35 +272,38 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
         </div>
       )}
       <div className="magit-commitbox">
-        <textarea
-          ref={commitRef}
-          className="magit-msg mono"
-          value={msg}
-          placeholder="Commit message…"
-          rows={3}
-          onChange={(e) => setMsg(e.target.value)}
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-              e.preventDefault();
-              void doCommit();
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              containerRef.current?.focus();
-            }
-          }}
-        />
-        <div className="magit-commit-actions">
-          <button
-            className="btn btn-sm primary"
-            disabled={!canCommit}
-            onClick={() => void doCommit()}
-            title="Commit the staged set (Ctrl+Enter)"
-          >{busy === 'commit' ? 'Committing…' : `Commit staged (${stagedCount})`}</button>
-          <span className="magit-commit-hint dim">
-            {stagedCount === 0
-              ? 'Nothing staged—stage changes first'
-              : 'Commits the staged set · Ctrl+Enter · Esc exits'}
-          </span>
+        <div className="field-box">
+          <textarea
+            ref={commitRef}
+            className="magit-msg mono"
+            value={msg}
+            placeholder="Commit message…"
+            rows={1}
+            onChange={(e) => setMsg(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                void doCommit();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                containerRef.current?.focus();
+              }
+            }}
+          />
+          <div className="field-bar">
+            <span className="magit-commit-hint dim">
+              {stagedCount === 0
+                ? 'Nothing staged — stage changes first'
+                : `${stagedCount} staged · Ctrl+Enter · Esc exits`}
+            </span>
+            <button
+              className={'field-send commit' + (busy === 'commit' ? ' loading' : '')}
+              disabled={!canCommit}
+              onClick={() => void doCommit()}
+              aria-label="Commit staged"
+              title={`Commit staged (${stagedCount}) · Ctrl+Enter`}
+            >{busy === 'commit' ? <IconRefresh /> : <IconCheck />}</button>
+          </div>
         </div>
       </div>
     </div>

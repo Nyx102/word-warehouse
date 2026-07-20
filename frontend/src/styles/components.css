@@ -33,6 +33,53 @@
 }
 .icon-btn:hover { color: var(--fg); background: var(--accent-dim); }
 
+.field-box {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 12px 0; /* top + sides; the bar supplies the matching bottom */
+}
+.field-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+.field-box textarea,
+.field-box textarea:focus {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  border-radius: 0;
+  padding: 0; /* the 12px frame lives on .field-box, incl. the scrollbar inset */
+  line-height: 20px;
+  resize: none;
+  overflow-y: auto;
+}
+/* Control bar: the same 12px rhythm — 12px above the controls, 12px below, and a
+ * 12px gap between them; the box's side padding gives their left/right inset. */
+.field-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+.field-send {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.field-send svg { width: 16px; height: 16px; }
+.field-send:hover:not(:disabled) { filter: brightness(1.1); }
+.field-send:disabled { background: var(--raise); color: var(--fg-dim); cursor: default; }
+.field-send.stop { background: var(--err); }
+.field-send.loading svg { animation: spin 0.9s linear infinite; }
+
 .linkish {
   color: var(--accent);
   background: none;
