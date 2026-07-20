@@ -53,7 +53,6 @@
   cursor: pointer;
   white-space: nowrap;
   font-size: 12.5px;
-  line-height: 1;
   max-width: 220px;
   flex: none;
   user-select: none;
@@ -72,6 +71,9 @@
   background: var(--accent);
 }
 .tab-title { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* Source Code Pro's ink sits ~1px above the box's geometric centre, so flex
+   centring alone reads slightly high; nudge the row's contents down to match. */
+.tab-title, .tab-tail { position: relative; top: 1px; }
 
 /* Trailing area: dirty dot plus a close button whose 18px box is always
    reserved, so revealing it on hover never shifts the layout. */
