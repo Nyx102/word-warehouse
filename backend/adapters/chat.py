@@ -12,8 +12,8 @@ import subprocess
 import threading
 import time
 
-from config import CORPUS, DATA
-from db import connect
+from backend.config import CORPUS, DATA
+from backend.db import connect
 
 CLAUDE_BIN = (os.environ.get("WORKBENCH_CLAUDE_BIN")
               or shutil.which("claude")

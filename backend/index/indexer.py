@@ -16,9 +16,9 @@ import unicodedata
 
 import yaml
 
-import trad2simp
-from config import CORPUS, INCLUDE_GLOBS, REPO, classify
-from db import connect
+from backend.index import trad2simp
+from backend.config import CORPUS, INCLUDE_GLOBS, REPO, classify
+from backend.db import connect
 
 MAX_CHUNK = 1000
 

@@ -16,9 +16,9 @@ import sys
 import time
 from collections import defaultdict
 
-from config import CORPUS, RULES_YAML, SCRIPTS_DIR
-from db import connect
-from indexer import ensure_fresh, strip_binary_junk
+from backend.config import CORPUS, RULES_YAML, SCRIPTS_DIR
+from backend.db import connect
+from backend.index.indexer import ensure_fresh, strip_binary_junk
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 import regex_replace  # noqa: E402  (the fan repo's own engine, imported not forked)
@@ -321,7 +321,7 @@ def undismiss(category, key):
 def cli_lint(path=None, verbose=False, scope="all", triage=False):
     report = lint(path, scope=scope)
     if triage:
-        import triage as triage_mod  # Lazy: only the --triage path needs AI wiring
+        from backend.lint import triage as triage_mod  # Lazy: only the --triage path needs AI wiring
         triage_mod.run_pending(report)
         triage_mod.annotate(report)
     if not report["files"]:

@@ -32,11 +32,11 @@ ENV HOME=/home/dev
 # here — nothing about the host's layout is assumed
 COPY . /word-warehouse
 COPY --from=webbuild /build/dist /word-warehouse/frontend/dist
-RUN ln -sf /word-warehouse/corpus_cli.py /usr/local/bin/corpus \
-    && chmod +x /word-warehouse/corpus_cli.py \
+RUN printf '#!/bin/sh\nexec env PYTHONPATH=/word-warehouse python3 -m backend.cli "$@"\n' > /usr/local/bin/corpus \
+    && chmod +x /usr/local/bin/corpus \
     && git config --system --add safe.directory '*'
 
 USER dev
 WORKDIR /word-warehouse
 EXPOSE 8686
-CMD ["python3", "server.py", "--host", "0.0.0.0", "--port", "8686"]
+CMD ["python3", "-m", "backend.server", "--host", "0.0.0.0", "--port", "8686"]

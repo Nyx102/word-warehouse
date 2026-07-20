@@ -5,8 +5,8 @@ surface, repo paths speak the same (repo, relative path) space as git
 status, and fs paths cover the Files-tab tree rooted at FS_ROOT.
 """
 
-import gitops
-from config import CORPUS, FS_ROOT
+from backend.adapters import gitops
+from backend.config import CORPUS, FS_ROOT
 
 
 def safe_corpus_path(rel):

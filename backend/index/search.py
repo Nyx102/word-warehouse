@@ -2,8 +2,8 @@
 
 import re
 
-from db import connect
-from indexer import ensure_fresh
+from backend.db import connect
+from backend.index.indexer import ensure_fresh
 
 CJK = re.compile(r"[぀-ヿ一-鿿㐀-䶿]")
 

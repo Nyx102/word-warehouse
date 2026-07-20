@@ -9,7 +9,7 @@ import re
 import subprocess
 import threading
 
-from config import REPO, ROOT
+from backend.config import REPO, ROOT
 
 # "corpus" is the unified project repo (code + corpus data, user decision);
 # "repo" is the nested translation repo. API key names are frozen contract.

@@ -7,7 +7,7 @@ import os
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 CORPUS = Path(os.environ.get("WORKBENCH_CORPUS", str(ROOT / "corpus")))
 DATA = Path(os.environ.get("WORKBENCH_DATA", str(ROOT / "data")))
 DB_PATH = DATA / "corpus.db"

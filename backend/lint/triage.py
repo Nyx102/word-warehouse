@@ -15,8 +15,8 @@ import subprocess
 import threading
 import time
 
-from config import CORPUS, DATA
-from db import connect
+from backend.config import CORPUS, DATA
+from backend.db import connect
 
 BATCH = 8
 RADII = (2, 10, 30)
@@ -56,7 +56,7 @@ _last_error = None  # Short message from the most recent failed batch (surfaced 
 
 
 def _claude_bin():
-    from chat import CLAUDE_BIN  # Lazy: resolve the CLI at call time, not import
+    from backend.adapters.chat import CLAUDE_BIN  # Lazy: resolve the CLI at call time, not import
     return CLAUDE_BIN
 
 
@@ -211,7 +211,7 @@ def schedule(report):
     def _work():
         global _worker_running
         try:
-            import chat  # Lazy: mirrors _claude_bin, no chat wiring at import
+            from backend.adapters import chat  # Lazy: mirrors _claude_bin, no chat wiring at import
 
             def wait_for_chat():
                 while chat.active_count() > 0:

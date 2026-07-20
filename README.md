@@ -18,8 +18,8 @@ docker compose up -d --build        # serves :8686 on all interfaces
 or directly on the host (same behavior, no container):
 
 ```sh
-python3 server.py                   # binds 127.0.0.1:8686
-python3 server.py --host 0.0.0.0    # expose beyond loopback
+python3 -m backend.server                   # binds 127.0.0.1:8686
+python3 -m backend.server --host 0.0.0.0    # expose beyond loopback
 ```
 
 ## How you actually use it
@@ -94,19 +94,19 @@ phone.
 
 | Path | What |
 |---|---|
-| `server.py` | pure-stdlib HTTP + SSE server; background poller keeps index fresh every 5 s (no AI credits — local stat scan) |
-| `pathsafe.py` | path-traversal guards (`safe_corpus_path` / `safe_repo_path` / `safe_fs_path`), one per served root |
-| `gitops.py` | git backend for the workspace git UI: porcelain-v2 status, worktree/staged diffs, file+hunk stage/unstage via `git apply --cached`, commit staged set, log/show/branches; per-repo mutex, injection guards |
-| `indexer.py` | segmentation per source format; JP ruby-strip + trad→simp shadow columns; SQLite FTS5 (unicode61 for EN, trigram for CJK) |
-| `search.py` | query routing EN/JP/ZH, LIKE fallback for short CJK, chapter alignment via `-subtitle-` join keys |
-| `checker.py` | lint: near-miss typos (edit-distance vs replacements.yaml vocab, official-EN whitelist) + leftover-term regression with exact rule simulation |
-| `chat.py` | claude CLI headless (stream-json, `--resume` per thread); permissions via flags (allow: read/search/edit + corpus CLI + read-only git; deny: commit/push/rm/sudo); **default model sonnet**, per-thread picker in the UI; credits are spent only here and in triage |
-| `triage.py` | AI flag adjudication: haiku judges lint flags from context (±2→±10→±30 line escalation, max 2), conservative, per-file verdict cache — unchanged text is never re-judged |
+| `backend/server.py` | pure-stdlib HTTP + SSE server; background poller keeps index fresh every 5 s (no AI credits — local stat scan) |
+| `backend/adapters/pathsafe.py` | path-traversal guards (`safe_corpus_path` / `safe_repo_path` / `safe_fs_path`), one per served root |
+| `backend/adapters/gitops.py` | git backend for the workspace git UI: porcelain-v2 status, worktree/staged diffs, file+hunk stage/unstage via `git apply --cached`, commit staged set, log/show/branches; per-repo mutex, injection guards |
+| `backend/index/indexer.py` | segmentation per source format; JP ruby-strip + trad→simp shadow columns; SQLite FTS5 (unicode61 for EN, trigram for CJK) |
+| `backend/index/search.py` | query routing EN/JP/ZH, LIKE fallback for short CJK, chapter alignment via `-subtitle-` join keys |
+| `backend/lint/checker.py` | lint: near-miss typos (edit-distance vs replacements.yaml vocab, official-EN whitelist) + leftover-term regression with exact rule simulation |
+| `backend/adapters/chat.py` | claude CLI headless (stream-json, `--resume` per thread); permissions via flags (allow: read/search/edit + corpus CLI + read-only git; deny: commit/push/rm/sudo); **default model sonnet**, per-thread picker in the UI; credits are spent only here and in triage |
+| `backend/lint/triage.py` | AI flag adjudication: haiku judges lint flags from context (±2→±10→±30 line escalation, max 2), conservative, per-file verdict cache — unchanged text is never re-judged |
 | `frontend/` | React + Vite + TS + CodeMirror IDE workspace (icon rail + sidebar + buffer tabs + chat dock; doom-one dark/light; vim/emacs/normal keymaps; mobile bottom nav, installable PWA). Rebuild after changes: `docker compose exec workbench sh -c 'cd frontend && npm run build'`; HMR dev server: `npm run dev` in-container on :5173 |
-| `corpus_cli.py` | the `corpus` command (symlinked into `~/.local/bin` and the container): search / context / align / terms / lint / sniff / status / reindex |
+| `backend/cli.py` | the `corpus` command (symlinked into `~/.local/bin` and the container): search / context / align / terms / lint / sniff / status / reindex |
 | `scripts/reorg.py` | one-shot corpus reorganization (already executed 2026-07-17) |
 | `scripts/coverage.py` | regenerates `corpus/notes/coverage.md` |
-| `scripts/gen_trad2simp.py` | regenerates `trad2simp.py` from the parallel v05 editions |
+| `scripts/gen_trad2simp.py` | regenerates `backend/index/trad2simp.py` from the parallel v05 editions |
 | `scripts/verify_gitops.py` | live verification of the git backend against a scratch repo (status parsing, stage/unstage, hunk cycle, commit, log, branches, injection rejections) |
 
 ## Data & state

@@ -12,8 +12,8 @@ import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import gitops  # noqa: E402
-from config import DATA  # noqa: E402
+from backend.adapters import gitops  # noqa: E402
+from backend.config import DATA  # noqa: E402
 
 TMP = DATA / "tmp-verify"
 MAIN = TMP / "main-repo"

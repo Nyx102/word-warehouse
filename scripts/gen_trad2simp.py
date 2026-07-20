@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate app/trad2simp.py from parallel simplified/traditional corpus text.
+"""Generate backend/index/trad2simp.py from parallel simplified/traditional corpus text.
 
 Alignment: two lines from the simp and trad editions of the same translation
 match if they have equal length and an identical "skeleton" (every non-Han char
@@ -14,9 +14,9 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import CORPUS, ROOT  # noqa: E402
+from backend.config import CORPUS, ROOT  # noqa: E402
 
-OUT = ROOT / "trad2simp.py"
+OUT = ROOT / "backend" / "index" / "trad2simp.py"
 
 # High-confidence manual seed (common chars; also covers pairs the harvest may miss)
 SEED = {

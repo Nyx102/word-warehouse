@@ -15,7 +15,7 @@ from pathlib import Path
 
 # Historical one-shot (executed 2026-07-17, pre-unification); kept for reference
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import CORPUS  # noqa: E402
+from backend.config import CORPUS  # noqa: E402
 
 JP = "japanese"
 

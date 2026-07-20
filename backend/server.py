@@ -19,18 +19,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-import chat
-import checker
-import gitops
-import search as searchmod
-from config import CORPUS, DATA, FS_ROOT, HOST, PORT, ROOT
-from db import connect
-from indexer import ensure_fresh
-from pathsafe import safe_corpus_path, safe_fs_path, safe_repo_path
+from backend.adapters import chat
+from backend.lint import checker
+from backend.adapters import gitops
+from backend.index import search as searchmod
+from backend.config import CORPUS, DATA, FS_ROOT, HOST, PORT, ROOT
+from backend.db import connect
+from backend.index.indexer import ensure_fresh
+from backend.adapters.pathsafe import safe_corpus_path, safe_fs_path, safe_repo_path
 
-_APP_DIR = Path(__file__).resolve().parent
-_DIST = _APP_DIR / "frontend" / "dist"
-STATIC = _DIST if _DIST.is_dir() else _APP_DIR / "static"
+_DIST = ROOT / "frontend" / "dist"
+STATIC = _DIST if _DIST.is_dir() else ROOT / "static"
 POLL_INTERVAL = 5
 MAX_BODY = 64 * 1024 * 1024  # Reject oversize request bodies (uploads) up front
 
@@ -53,7 +52,7 @@ def _refresh_lint(force=False, scope="all"):
 
 
 def poller():
-    import triage  # Lazy: keeps the AI-credit machinery out of module import
+    from backend.lint import triage  # Lazy: keeps the AI-credit machinery out of module import
     while True:
         try:
             changed = ensure_fresh()
@@ -377,7 +376,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(ok=True))
 
     def h_triage_reject(self):
-        import triage  # Lazy: keeps the AI-credit machinery out of module import
+        from backend.lint import triage  # Lazy: keeps the AI-credit machinery out of module import
         b = self._body()
         triage.user_override(b["category"], b["key"])
         _refresh_lint(force=True)
@@ -386,7 +385,7 @@ class Handler(BaseHTTPRequestHandler):
     def h_triage_run(self):
         """Manual 'Triage now': force a triage pass over the current flags,
         clearing any failure backoff."""
-        import triage  # Lazy: keeps the AI-credit machinery out of module import
+        from backend.lint import triage  # Lazy: keeps the AI-credit machinery out of module import
         report = _refresh_lint(scope="all")
         triage.run_now(dict(report))
         self._json(dict(ok=True, triage=triage.status()))
@@ -407,7 +406,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(dict(markdown=text))
 
     def h_lint(self):
-        import triage  # Lazy: keeps the AI-credit machinery out of module import
+        from backend.lint import triage  # Lazy: keeps the AI-credit machinery out of module import
         scope = self._q("scope", "all")
         if scope not in ("raw", "finished", "all"):
             return self._error("bad scope", 400)

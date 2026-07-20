@@ -11,10 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-APP = Path(__file__).resolve().parent
-sys.path.insert(0, str(APP))
-
-from config import CORPUS, RULES_YAML, SCRIPTS_DIR  # noqa: E402
+from backend.config import CORPUS, RULES_YAML, SCRIPTS_DIR
 
 # Subcommands import their heavy deps lazily so argparse and --help stay instant
 
@@ -35,7 +32,7 @@ def _print_hit(r):
 
 
 def cmd_search(args):
-    import search
+    from backend.index import search
     rows = search.search(args.query, lang=args.lang, series=args.series,
                          source=args.source, kind=args.kind, limit=args.limit)
     if not rows:
@@ -47,7 +44,7 @@ def cmd_search(args):
 
 
 def cmd_context(args):
-    import search
+    from backend.index import search
     ctx = search.context(args.chunk_id, before=args.before, after=args.after)
     if not ctx:
         print(f"no chunk c{args.chunk_id}")
@@ -62,7 +59,7 @@ def cmd_context(args):
 
 
 def cmd_align(args):
-    import search
+    from backend.index import search
     rows = search.align(args.series, args.volume)
     if not rows:
         print("no chapters found")
@@ -97,8 +94,8 @@ def cmd_align(args):
 def cmd_terms(args):
     sys.path.insert(0, str(SCRIPTS_DIR))
     import regex_replace
-    import search
-    from indexer import ensure_fresh
+    from backend.index import search
+    from backend.index.indexer import ensure_fresh
     ensure_fresh()
     rules = regex_replace.load_rules(RULES_YAML)
     word = args.word.lower()
@@ -125,7 +122,7 @@ def cmd_terms(args):
 
 
 def cmd_sniff(args):
-    from indexer import sniff_lang
+    from backend.index.indexer import sniff_lang
     p = Path(args.file)
     if not p.is_absolute():
         p = CORPUS / p
@@ -153,8 +150,8 @@ def cmd_sniff(args):
 
 
 def cmd_status(args):
-    from db import connect
-    from indexer import ensure_fresh
+    from backend.db import connect
+    from backend.index.indexer import ensure_fresh
     conn = connect()
     n = ensure_fresh(conn)
     print(f"reindexed just now: {n} file(s)")
@@ -170,13 +167,13 @@ def cmd_status(args):
 
 
 def cmd_reindex(args):
-    from indexer import ensure_fresh
+    from backend.index.indexer import ensure_fresh
     n = ensure_fresh(force=True)
     print(f"reindexed {n} file(s)")
 
 
 def cmd_lint(args):
-    import checker
+    from backend.lint import checker
     try:
         checker.cli_lint(args.path, verbose=args.verbose, scope=args.scope,
                          triage=args.triage)

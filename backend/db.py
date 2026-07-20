@@ -3,7 +3,7 @@
 import sqlite3
 import threading
 
-from config import DATA, DB_PATH
+from backend.config import DATA, DB_PATH
 
 SCHEMA_VERSION = 3
 
