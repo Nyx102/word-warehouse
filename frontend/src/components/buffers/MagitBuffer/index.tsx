@@ -14,6 +14,7 @@ import {
 } from '@/features/git/gitApi';
 import { gitKeys } from '@/features/git/gitKeys';
 import { useGitMutations } from '@/features/git/useGitMutations';
+import { IconRefresh } from '@/components/layout/icons';
 import type { GitStatusFile, RepoName } from '@/lib/types';
 import { CommitRow } from './CommitRow';
 import { Section } from './Section';
@@ -236,9 +237,13 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
         <span className="magit-keys dim">
           {keymap === 'vim' ? 'j/k move' : 'n/p move'} · TAB expand · s/u stage/unstage · RET visit · l log · c commit · g refresh
         </span>
-        <button className="btn btn-sm" onClick={() => void refetch()} disabled={loading} title="Refresh (g)">
-          {loading ? '…' : '↻'}
-        </button>
+        <button
+          className={'icon-btn magit-refresh' + (loading ? ' loading' : '')}
+          onClick={() => void refetch()}
+          disabled={loading}
+          title="Refresh (g)"
+          aria-label="Refresh"
+        ><IconRefresh /></button>
       </div>
       {error && (
         <div className="magit-error">

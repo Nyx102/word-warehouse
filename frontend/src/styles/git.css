@@ -101,6 +101,9 @@
   padding: 0 5px;
 }
 .magit-keys { font-size: 11px; }
+.magit-refresh { flex: none; margin-left: -4px; margin-right: -6px; }
+.magit-refresh svg { width: 16px; height: 16px; display: block; }
+.magit-refresh.loading svg { animation: spin 0.9s linear infinite; }
 
 .magit-body { flex: 1; overflow-y: auto; min-height: 0; padding: 6px 0 14px; }
 .magit-error {
