@@ -3,12 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useWorkspace } from '@/context/workspace';
 import { toast } from '@/components/Toasts';
 import { fileLabel, repoLabel, statusClass } from '@/features/git/fmt';
-import { gitBranches, gitStatus } from '@/features/git/gitApi';
+import { gitBranches, gitStatus, type GitMutateResult } from '@/features/git/gitApi';
 import { gitKeys } from '@/features/git/gitKeys';
 import { useGitMutations } from '@/features/git/useGitMutations';
 import { Select } from '@/components/Select';
-import { IconGit, IconHistory } from '@/components/layout/icons';
+import { Modal } from '@/components/Modal';
+import { IconGit, IconHistory, IconMinus, IconPlus } from '@/components/layout/icons';
 import type { GitStatusFile, RepoName } from '@/lib/types';
+
+type SideGroup = 'staged' | 'unstaged' | 'untracked';
+type RowMenu = { file: GitStatusFile; group: SideGroup; x: number; y: number } | null;
 
 /** Git section: repo picker, branch block (switch/create), dirty summary,
  * status/log launchers, compact changed-file list. (Coverage isn't a git
@@ -23,6 +27,9 @@ export function GitSidebar() {
   const [creating, setCreating] = useState(false);
   const [newBranch, setNewBranch] = useState('');
   const [switching, setSwitching] = useState(false);
+  const [menu, setMenu] = useState<RowMenu>(null);
+  const [busyPath, setBusyPath] = useState<string | null>(null);
+  const [discard, setDiscard] = useState<GitStatusFile | null>(null);
 
   const status = useQuery({
     queryKey: gitKeys.status(repo),
@@ -45,6 +52,14 @@ export function GitSidebar() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.rail]);
+
+  // Esc dismisses the row context menu
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menu]);
 
   const openStatus = () => { ws.open({ kind: 'magit', repo }); ws.setDrawerOpen(false); };
   const openLog = () => { ws.open({ kind: 'log', repo }); ws.setDrawerOpen(false); };
@@ -92,15 +107,69 @@ export function GitSidebar() {
     ws.open({ kind: 'diff', repo, path: f.path });
     ws.setDrawerOpen(false);
   };
+  const openHistory = (f: GitStatusFile) => {
+    ws.open({ kind: 'log', repo, path: f.path });
+    ws.setDrawerOpen(false);
+  };
 
-  const group = (title: string, list: GitStatusFile[], ch: (f: GitStatusFile) => string) =>
+  // Per-file index moves. The mutation invalidates ['git', repo], so the row
+  // just hops to the right section on the refetch; busyPath disables its own
+  // buttons in the meantime.
+  const act = async (path: string, fn: () => Promise<GitMutateResult>) => {
+    setBusyPath(path);
+    try { await fn(); } finally { setBusyPath(null); }
+  };
+  const doStage = (f: GitStatusFile) => void act(f.path, () => git.stage([f.path]));
+  const doUnstage = (f: GitStatusFile) => void act(f.path, () => git.unstage([f.path]));
+  const doDiscard = (f: GitStatusFile) => { setDiscard(null); void act(f.path, () => git.revert(f.path)); };
+
+  const openMenu = (f: GitStatusFile, g: SideGroup, x: number, y: number) => setMenu({ file: f, group: g, x, y });
+  const menuStyle = menu
+    ? {
+      left: Math.max(4, Math.min(menu.x, window.innerWidth - 180)),
+      top: Math.max(4, Math.min(menu.y, window.innerHeight - 170)),
+    }
+    : undefined;
+
+  const group = (title: string, g: SideGroup, list: GitStatusFile[], ch: (f: GitStatusFile) => string) =>
     list.length > 0 && (
       <div className="git-side-group">
         <div className="side-h">{title} ({list.length})</div>
         {list.map((f) => (
-          <div key={f.path} className="file-row" onClick={() => openDiff(f)}>
+          <div
+            key={f.path}
+            className="file-row"
+            onClick={() => openDiff(f)}
+            onContextMenu={(e) => { e.preventDefault(); openMenu(f, g, e.clientX, e.clientY); }}
+          >
             <span className={'git-st ' + statusClass(ch(f))}>{ch(f)}</span>
             <span className="file-path mono" title={f.path}>{fileLabel(f)}</span>
+            <span className="row-actions">
+              {g === 'staged' ? (
+                <button
+                  className="row-act"
+                  disabled={busyPath === f.path}
+                  onClick={(e) => { e.stopPropagation(); doUnstage(f); }}
+                  title="Unstage" aria-label={'Unstage ' + f.path}
+                ><IconMinus /></button>
+              ) : (
+                <button
+                  className="row-act"
+                  disabled={busyPath === f.path}
+                  onClick={(e) => { e.stopPropagation(); doStage(f); }}
+                  title={g === 'untracked' ? 'Stage (add file)' : 'Stage'} aria-label={'Stage ' + f.path}
+                ><IconPlus /></button>
+              )}
+              <button
+                className="row-act kebab"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  openMenu(f, g, r.left, r.bottom);
+                }}
+                title="More actions" aria-label={'More actions for ' + f.path}
+              >⋯</button>
+            </span>
           </div>
         ))}
       </div>
@@ -183,13 +252,57 @@ export function GitSidebar() {
       </div>
 
       <div className="git-filelist">
-        {group('Staged', staged, (f) => f.index)}
-        {group('Unstaged', unstaged, (f) => f.worktree)}
-        {group('Untracked', untracked, () => '?')}
+        {group('Staged', 'staged', staged, (f) => f.index)}
+        {group('Unstaged', 'unstaged', unstaged, (f) => f.worktree)}
+        {group('Untracked', 'untracked', untracked, () => '?')}
         {status.data && files.length === 0 && (
           <div className="magit-empty dim">working tree clean</div>
         )}
       </div>
+
+      {menu && (
+        <div
+          className="ctx-overlay"
+          onClick={() => setMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}
+        >
+          <div className="ctx-menu" style={menuStyle} onClick={(e) => e.stopPropagation()}>
+            <div className="ctx-title mono" title={menu.file.path}>{fileLabel(menu.file)}</div>
+            <button className="ctx-item" onClick={() => { openDiff(menu.file); setMenu(null); }}>Open diff</button>
+            {menu.group === 'staged' ? (
+              <button className="ctx-item" onClick={() => { doUnstage(menu.file); setMenu(null); }}>Unstage</button>
+            ) : (
+              <button className="ctx-item" onClick={() => { doStage(menu.file); setMenu(null); }}>
+                {menu.group === 'untracked' ? 'Stage (add file)' : 'Stage'}
+              </button>
+            )}
+            {menu.group !== 'untracked' && (
+              <button className="ctx-item" onClick={() => { openHistory(menu.file); setMenu(null); }}>File history</button>
+            )}
+            {/* Restore needs a HEAD version; a newly-added file (index 'A') has
+                none, so discarding it would mean deletion, which the server
+                refuses. Hide it rather than offer a guaranteed error. */}
+            {menu.group !== 'untracked' && menu.file.index !== 'A' && (
+              <button className="ctx-item danger" onClick={() => { setDiscard(menu.file); setMenu(null); }}>Discard changes…</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {discard && (
+        <Modal
+          title="Discard changes"
+          onClose={() => setDiscard(null)}
+          footer={(
+            <>
+              <button className="btn" onClick={() => setDiscard(null)}>Cancel</button>
+              <button className="btn danger" onClick={() => doDiscard(discard)}>Discard</button>
+            </>
+          )}
+        >
+          <p>Discard working changes to <code>{discard.path}</code> and restore the committed version? This can't be undone.</p>
+        </Modal>
+      )}
     </div>
   );
 }

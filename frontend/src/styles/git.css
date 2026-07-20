@@ -379,7 +379,25 @@
 .git-side-group .side-h { margin: 0 0 4px; }
 .git-side-group .file-row { padding: 5px 6px; min-height: 30px; }
 
-/* Repo toggle: fill the pill evenly instead of leaving trailing blank space */
+.git-side-group .file-row .row-actions { gap: 2px; }
+.git-side-group .file-row:hover .row-actions { visibility: visible; }
+.row-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg-dim);
+  flex: none;
+}
+.row-act svg { width: 15px; height: 15px; }
+.row-act.kebab { font-size: 17px; line-height: 1; }
+.row-act:hover:not(:disabled) { color: var(--accent); background: var(--accent-dim); }
+.row-act:disabled { opacity: 0.4; }
+
 .git-side .seg { align-self: stretch; }
 .git-side .seg-btn { flex: 1; justify-content: center; }
 
@@ -391,6 +409,7 @@
   .magit-row { padding: 6px 10px; min-height: 40px; }
   .row-actions { visibility: visible; }
   .row-actions .btn { min-height: 30px; height: 30px; }
+  .row-act { width: 32px; height: 32px; }
   .magit-hunk { margin: 2px 8px 10px 18px; }
   .magit-section-h { padding: 6px 10px 4px; }
   .log-buffer-row .log-author { display: none; }
