@@ -5,16 +5,10 @@ import { api, ApiError } from '../api';
 import { toast } from '../components/Toasts';
 import { useMediaQuery } from '../util';
 import { useSettings } from '../app/settings';
-import { applyKeymap, baseExtensions, flashLine, languageForPath, wireVimModeIndicator } from '../editor/cm';
-import { setCursorPos, type CursorPos } from '../editor/cursorStore';
+import { applyKeymap, baseExtensions, cursorFromState, flashLine, languageForPath, wireVimModeIndicator } from '../editor/cm';
+import { setCursorPos } from '../editor/cursorStore';
 import { setVimMode } from '../editor/vimModeStore';
 import type { FileFull } from '../types';
-
-function cursorFromState(state: EditorState): CursorPos {
-  const head = state.selection.main.head;
-  const line = state.doc.lineAt(head);
-  return { line: line.number, col: head - line.from + 1 };
-}
 
 /** Breadcrumb path: the directory part shrinks with an ellipsis, the file
  * name always stays visible. */

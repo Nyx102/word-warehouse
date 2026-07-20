@@ -44,7 +44,7 @@ export function ModeLine({ status, busy }: { status: StatusInfo | null; busy: bo
         {active ? active.title : 'no buffer'}
       </span>
       {desc && <span className="ml-mode">{bufferModeLabel(desc)}</span>}
-      {desc?.kind === 'file' && cursor && (
+      {(desc?.kind === 'file' || desc?.kind === 'commit') && cursor && (
         <span className="ml-pos">{cursor.line}:{cursor.col}</span>
       )}
       <span className="toolbar-spacer" />

@@ -1,12 +1,16 @@
 import { api } from '../api';
+import { useWorkspace } from '../app/workspace';
 import { useAsync } from '../hooks/useAsync';
+import { useKeyboardScroll } from '../hooks/useKeyboardScroll';
 import { Markdown } from '../markdown';
 
 /** Help buffer: the server's help markdown on sans prose. */
 export function HelpBuffer() {
+  const ws = useWorkspace();
   const help = useAsync(() => api<{ markdown: string }>('/api/help'), []);
+  const scroll = useKeyboardScroll(ws.activeId === 'help');
   return (
-    <div className="doc-buffer">
+    <div className="doc-buffer" {...scroll}>
       <div className="doc-tools">
         <span className="dim">Workbench help</span>
         <span className="toolbar-spacer" />

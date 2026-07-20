@@ -162,6 +162,11 @@
 /* Alignment buffer */
 .align-buffer { flex: 1; min-height: 0; overflow-y: auto; padding-top: 12px; }
 
+/* Both take focus for keyboard scrolling (useKeyboardScroll); a faint inset
+ * ring only on keyboard focus, same treatment as the magit buffer. */
+.doc-buffer, .align-buffer { outline: none; }
+.doc-buffer:focus-visible, .align-buffer:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-dim); }
+
 /* Chat dock: one permanent subtree; hidden/docked/full are CSS-only states */
 .chat-dock {
   display: none;

@@ -258,7 +258,11 @@
 
 /* ---- commit buffer ---- */
 
-.commit-buffer { flex: 1; overflow-y: auto; min-height: 0; }
+/* Header (meta + numstat) stays put and scrolls on its own if a commit
+ * touches a lot of files; the patch below is a self-scrolling editor, so the
+ * buffer itself is a fixed flex column rather than one long scroll. */
+.commit-buffer { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.commit-header { flex: none; max-height: 45%; overflow-y: auto; }
 .commit-meta {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
@@ -302,8 +306,7 @@
 .commit-stat-row .magit-path { flex: 1; }
 .stat-add { color: var(--vc-added); font-family: var(--mono); flex: none; }
 .stat-del { color: var(--vc-deleted); font-family: var(--mono); flex: none; }
-.commit-patch { padding-bottom: 20px; }
-.commit-patch-file { border-bottom: 1px solid var(--border); scroll-margin-top: 8px; }
+.commit-patch { border-top: 1px solid var(--border); }
 
 /* ---- diff buffer toolbar ---- */
 

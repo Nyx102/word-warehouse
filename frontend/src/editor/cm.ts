@@ -1,8 +1,20 @@
-import { Compartment, EditorSelection, Prec, StateEffect, StateField, type Extension } from '@codemirror/state';
 import {
+  Compartment,
+  EditorSelection,
+  EditorState,
+  Prec,
+  RangeSetBuilder,
+  StateEffect,
+  StateField,
+  type Extension,
+} from '@codemirror/state';
+import {
+  Decoration,
+  type DecorationSet,
   EditorView,
   RectangleMarker,
   ViewPlugin,
+  type ViewUpdate,
   drawSelection,
   highlightActiveLine,
   keymap,
@@ -20,7 +32,17 @@ import { html } from '@codemirror/lang-html';
 import { yaml } from '@codemirror/lang-yaml';
 import { Vim, getCM, vim } from '@replit/codemirror-vim';
 import { doomTheme } from './theme';
+import type { CursorPos } from './cursorStore';
 import type { KeymapName } from '../app/settings';
+
+/** 1-based line/col of the primary cursor, for the modeline readout. Shared by
+ * the editable file editor and the read-only viewer so both report position
+ * the same way. */
+export function cursorFromState(state: EditorState): CursorPos {
+  const head = state.selection.main.head;
+  const line = state.doc.lineAt(head);
+  return { line: line.number, col: head - line.from + 1 };
+}
 
 /* The vim modal plugin processes keys in a view-plugin keydown handler and
  * its command table is a module-level singleton, so per-editor save actions
@@ -163,6 +185,84 @@ export function baseExtensions({ onSave, wrap, keymap: mode }: {
 /** Switch a live editor's keymap mode without rebuilding it. */
 export function applyKeymap(view: EditorView, mode: KeymapName): void {
   view.dispatch({ effects: keymapCompartment.reconfigure(modalExt(mode)) });
+}
+
+/** Read-only but fully navigable editor extensions: a real cursor and the
+ * same modal keymap the file editor uses (vim motions / normal caret), search,
+ * active-line highlight and scrolling — minus the write path (no history, save
+ * or indent binding). Edits are blocked by EditorState.readOnly while the view
+ * stays focusable, so arrows/j/k/Ctrl-d/Ctrl-u drive a point exactly as they
+ * do in an editable buffer. Reconfigure the mode later with applyKeymap (the
+ * keymapCompartment is shared with the editable editors). */
+export function readOnlyExtensions({ wrap, keymap: mode }: {
+  wrap: boolean;
+  keymap: KeymapName;
+}): Extension[] {
+  const ext: Extension[] = [
+    EditorState.readOnly.of(true),
+    // Same reverse-order-mount reasoning as baseExtensions: our theme must be
+    // encountered before vim's own fat-cursor theme to win the cascade.
+    themeCompartment.of(doomTheme),
+    keymapCompartment.of(modalExt(mode)),
+    lineNumbers(),
+    highlightActiveLine(),
+    drawSelection(),
+    flashLineExt(),
+    highlightSelectionMatches(),
+    keymap.of([...defaultKeymap, ...searchKeymap]),
+  ];
+  if (wrap) ext.push(EditorView.lineWrapping);
+  return ext;
+}
+
+/* Diff colorization for the read-only viewer: line decorations mirroring
+ * git/DiffText's lineClass exactly (same +/-/@@/meta buckets, same tokens) so
+ * a diff shown in CodeMirror reads identically to the plain-div renderer, just
+ * navigable. Only visible lines are decorated (the doc never changes). */
+const DIFF_META_RE = /^(diff --git|index |new file|deleted file|old mode|new mode|similarity|dissimilarity|rename|copy (from|to)|Binary files |GIT binary)/;
+
+const diffDeco = {
+  add: Decoration.line({ class: 'cm-diff-add' }),
+  del: Decoration.line({ class: 'cm-diff-del' }),
+  hunk: Decoration.line({ class: 'cm-diff-hunk' }),
+  meta: Decoration.line({ class: 'cm-diff-meta' }),
+};
+
+function diffDecoForLine(line: string): Decoration | null {
+  if (DIFF_META_RE.test(line)) return diffDeco.meta;
+  if (line.startsWith('+++') || line.startsWith('---')) return diffDeco.meta;
+  if (line.startsWith('@@')) return diffDeco.hunk;
+  if (line.startsWith('\\')) return diffDeco.meta;
+  if (line.startsWith('+')) return diffDeco.add;
+  if (line.startsWith('-')) return diffDeco.del;
+  return null;
+}
+
+function buildDiffDeco(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const { from, to } of view.visibleRanges) {
+    for (let pos = from; pos <= to;) {
+      const line = view.state.doc.lineAt(pos);
+      const deco = diffDecoForLine(line.text);
+      if (deco) builder.add(line.from, line.from, deco);
+      pos = line.to + 1;
+    }
+  }
+  return builder.finish();
+}
+
+/** Colorize a read-only diff (used with readOnlyExtensions). */
+export function diffColorsExt(): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) { this.decorations = buildDiffDeco(view); }
+      update(u: ViewUpdate) {
+        if (u.docChanged || u.viewportChanged) this.decorations = buildDiffDeco(u.view);
+      }
+    },
+    { decorations: (v) => v.decorations },
+  );
 }
 
 /** Escape hatch: swap the theme extension on a live editor. The doom theme

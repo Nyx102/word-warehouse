@@ -46,6 +46,18 @@
 .merge-host > .cm-editor { height: 100%; }
 .cm-editor { font-size: 13px; }
 
+/* Read-only navigable viewer (editor/ReadOnlyEditor): the CM view manages its
+ * own scroll, so the host is just a bounded flex box that pins it to 100%. */
+.ro-editor-host { flex: 1; min-height: 0; overflow: hidden; -webkit-overflow-scrolling: touch; }
+.ro-editor-host > .cm-editor { height: 100%; }
+
+/* Diff colorization for the read-only viewer (cm.ts diffColorsExt); same
+ * --vc-* tokens as the plain-div renderer in git.css so both read alike. */
+.cm-editor .cm-diff-add { background: var(--vc-added-bg); color: var(--vc-added); }
+.cm-editor .cm-diff-del { background: var(--vc-deleted-bg); color: var(--vc-deleted); }
+.cm-editor .cm-diff-hunk { color: var(--accent); background: var(--accent-dim); }
+.cm-editor .cm-diff-meta { color: var(--fg-dim); }
+
 /* Jump-to-line flash (flashLine()): a cosmetic overlay rect drawn the same
  * way CodeMirror draws real selections, so it's equally visible without
  * ever touching actual selection state. Holds briefly then fades via CSS —
@@ -71,8 +83,9 @@
 .cm-editor .cm-inlineChangedText { background: var(--vc-deleted-hl); }
 .cm-deletedText, .cm-deletedChunk del { background: var(--vc-deleted-hl); text-decoration: none; }
 
-/* Read-only unified diff fallback (>2MB files); rendering is git/DiffText */
-.fallback-diff { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+/* Read-only unified diff fallback (>2MB files); the ReadOnlyEditor inside
+ * scrolls itself, so this stays a plain bounded flex column. */
+.fallback-diff { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .fallback-note {
   padding: 8px 12px;
   color: var(--warn);

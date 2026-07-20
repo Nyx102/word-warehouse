@@ -1,12 +1,16 @@
 import { api } from '../api';
+import { useWorkspace } from '../app/workspace';
 import { useAsync } from '../hooks/useAsync';
+import { useKeyboardScroll } from '../hooks/useKeyboardScroll';
 import { Markdown } from '../markdown';
 
 /** Coverage report buffer: server-generated markdown on sans prose. */
 export function CoverageBuffer() {
+  const ws = useWorkspace();
   const cov = useAsync(() => api<{ markdown: string }>('/api/coverage'), []);
+  const scroll = useKeyboardScroll(ws.activeId === 'coverage');
   return (
-    <div className="doc-buffer">
+    <div className="doc-buffer" {...scroll}>
       <div className="doc-tools">
         <span className="dim">Translation coverage</span>
         <span className="toolbar-spacer" />

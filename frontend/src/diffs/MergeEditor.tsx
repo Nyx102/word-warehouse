@@ -14,7 +14,7 @@ import { useMediaQuery } from '../util';
 import { useSettings } from '../app/settings';
 import { applyKeymap, baseExtensions, flashLine, languageForPath, wireVimModeIndicator } from '../editor/cm';
 import { setVimMode } from '../editor/vimModeStore';
-import { DiffText } from '../git/DiffText';
+import { ReadOnlyEditor } from '../editor/ReadOnlyEditor';
 import type { FileFull, GitFileResponse, RepoName } from '../types';
 
 interface Loaded {
@@ -203,8 +203,10 @@ export function MergeEditor({ repo, path, status, gotoLine, active, onChanged, o
       const mv = new MergeView({
         parent,
         a: {
+          // readOnly (not editable:false) keeps the HEAD side focusable, so
+          // the cursor and every motion work there too — you just can't type.
           doc: file.original,
-          extensions: [...base, EditorState.readOnly.of(true), EditorView.editable.of(false)],
+          extensions: [...base, EditorState.readOnly.of(true)],
         },
         b: { doc, extensions: [...base, listener] },
         revertControls: 'a-to-b',
@@ -347,7 +349,9 @@ export function MergeEditor({ repo, path, status, gotoLine, active, onChanged, o
       {file?.fallbackDiff != null && (
         <div className="fallback-diff">
           <div className="fallback-note">{file.fallbackReason}</div>
-          <DiffText text={file.fallbackDiff} />
+          {file.fallbackDiff.trim()
+            ? <ReadOnlyEditor text={file.fallbackDiff} diff active={active} />
+            : <div className="empty">No diff.</div>}
         </div>
       )}
       <div className={'merge-host' + (editable ? '' : ' hidden')} ref={hostRef} />

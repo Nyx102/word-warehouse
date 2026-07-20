@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api';
+import { useWorkspace } from '../app/workspace';
+import { useKeyboardScroll } from '../hooks/useKeyboardScroll';
 import { hashHue } from '../util';
 import type { AlignRow } from '../types';
 
@@ -23,11 +25,13 @@ interface VolBlock {
 /** Chapter alignment matrix buffer: volumes down the page, one column per
  * source/lang; rows sharing subtitle_key get the same pastel tint. */
 export function AlignBuffer() {
+  const ws = useWorkspace();
   const [series, setSeries] = useState('any');
   const [volume, setVolume] = useState('');
   const [rows, setRows] = useState<AlignRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const scroll = useKeyboardScroll(ws.activeId === 'align');
 
   const load = async () => {
     const params = new URLSearchParams();
@@ -67,7 +71,7 @@ export function AlignBuffer() {
   }
 
   return (
-    <div className="align-buffer">
+    <div className="align-buffer" {...scroll}>
       <div className="align-controls">
         <select value={series} onChange={(e) => setSeries(e.target.value)} title="Series">
           <option value="any">series: any</option>
