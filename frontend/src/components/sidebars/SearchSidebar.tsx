@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { useWorkspace } from '@/context/workspace';
 import { ChunkModal } from '@/features/search/ChunkModal';
 import { ResultCard } from '@/features/search/ResultCard';
+import { Select } from '@/components/Select';
 import { IconMatrix } from '@/components/layout/icons';
 import type { SearchResult } from '@/lib/types';
 
@@ -88,21 +89,29 @@ export function SearchSidebar() {
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) run(); }}
         />
         <div className="ss-grid">
-          <select value={lang} onChange={(e) => setLang(e.target.value)} title="Language">
-            {LANGS.map((l) => <option key={l} value={l}>{l === 'any' ? 'lang: any' : l}</option>)}
-          </select>
-          <select value={series} onChange={(e) => setSeries(e.target.value)} title="Series">
-            <option value="any">series: any</option>
-            <option value="1">WorldEnd</option>
-            <option value="2">WorldEnd2</option>
-          </select>
-          <select value={source} onChange={(e) => setSource(e.target.value)} title="Source">
-            {SOURCES.map((s) => <option key={s} value={s}>{s === 'any' ? 'source: any' : s}</option>)}
-          </select>
-          <select value={kind} onChange={(e) => setKind(e.target.value)} title="Chunk kind">
-            <option value="body">kind: body</option>
-            <option value="all">kind: all</option>
-          </select>
+          <Select
+            value={lang} onChange={setLang} title="Language" ariaLabel="Language"
+            options={LANGS.map((l) => ({ value: l, label: l === 'any' ? 'lang: any' : l }))}
+          />
+          <Select
+            value={series} onChange={setSeries} title="Series" ariaLabel="Series"
+            options={[
+              { value: 'any', label: 'series: any' },
+              { value: '1', label: 'WorldEnd' },
+              { value: '2', label: 'WorldEnd2' },
+            ]}
+          />
+          <Select
+            value={source} onChange={setSource} title="Source" ariaLabel="Source"
+            options={SOURCES.map((s) => ({ value: s, label: s === 'any' ? 'source: any' : s }))}
+          />
+          <Select
+            value={kind} onChange={setKind} title="Chunk kind" ariaLabel="Chunk kind"
+            options={[
+              { value: 'body', label: 'kind: body' },
+              { value: 'all', label: 'kind: all' },
+            ]}
+          />
         </div>
         <div className="ss-actions">
           <input

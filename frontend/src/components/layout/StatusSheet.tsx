@@ -2,6 +2,7 @@ import { fmtAge } from '@/lib/util';
 import { useSettings, type KeymapName } from '@/context/settings';
 import { useWorkspace } from '@/context/workspace';
 import { repoLabel } from '@/features/git/fmt';
+import { Select } from '@/components/Select';
 import type { RepoName, StatusInfo } from '@/lib/types';
 
 /** Status overlay: index freshness, dirty counts (tap to open magit), chat
@@ -57,14 +58,16 @@ export function StatusSheet({ status, busy, onClose }: {
         </button>
         <div className="sheet-row sheet-mobile">
           <span>Keymap</span>
-          <select
+          <Select
             value={keymap}
-            onChange={(e) => setKeymap(e.target.value as KeymapName)}
-            aria-label="Editor keymap"
-          >
-            <option value="normal">Normal</option>
-            <option value="vim">Vim</option>
-          </select>
+            onChange={(k) => setKeymap(k as KeymapName)}
+            ariaLabel="Editor keymap"
+            align="right"
+            options={[
+              { value: 'normal', label: 'Normal' },
+              { value: 'vim', label: 'Vim' },
+            ]}
+          />
         </div>
         <button className="sheet-row linkish sheet-mobile"
           onClick={() => { ws.open({ kind: 'help' }); onClose(); }}>

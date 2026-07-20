@@ -6,7 +6,8 @@ import { fileLabel, repoLabel, statusClass } from '@/features/git/fmt';
 import { gitBranches, gitStatus } from '@/features/git/gitApi';
 import { gitKeys } from '@/features/git/gitKeys';
 import { useGitMutations } from '@/features/git/useGitMutations';
-import { IconChevronRight, IconGit, IconHistory } from '@/components/layout/icons';
+import { Select } from '@/components/Select';
+import { IconGit, IconHistory } from '@/components/layout/icons';
 import type { GitStatusFile, RepoName } from '@/lib/types';
 
 /** Git section: repo picker, branch block (switch/create), dirty summary,
@@ -122,22 +123,16 @@ export function GitSidebar() {
 
       <div className="git-branchblock">
         <div className="git-branch-row">
-          <span className="git-branch-select-wrap">
-            <select
-              className="git-branch-select mono"
-              value={cur ?? ''}
-              disabled={switching || !branches.data}
-              onChange={(e) => void doSwitch(e.target.value)}
-              aria-label="Switch branch"
-              title="Switch branch"
-            >
-              {cur === null && <option value="" disabled hidden>{branches.data ? 'detached' : '…'}</option>}
-              {(branches.data?.branches ?? []).map((br) => (
-                <option key={br.name} value={br.name}>{br.name}</option>
-              ))}
-            </select>
-            <span className="git-branch-caret"><IconChevronRight /></span>
-          </span>
+          <Select
+            className="git-branch-select mono"
+            value={cur ?? ''}
+            disabled={switching || !branches.data}
+            onChange={(name) => void doSwitch(name)}
+            ariaLabel="Switch branch"
+            title="Switch branch"
+            placeholder={branches.data ? 'detached' : '…'}
+            options={(branches.data?.branches ?? []).map((br) => ({ value: br.name, label: br.name }))}
+          />
           {b && b.ahead != null && (b.ahead > 0 || (b.behind ?? 0) > 0) && (
             <span className="magit-ab" title={`ahead ${b.ahead}, behind ${b.behind}`}>
               ↑{b.ahead} ↓{b.behind}

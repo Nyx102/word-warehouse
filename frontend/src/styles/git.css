@@ -328,33 +328,15 @@
 }
 .git-branchblock { display: flex; flex-direction: column; gap: 6px; }
 .git-branch-row { display: flex; align-items: center; gap: 8px; }
-.git-branch-select-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
-.git-branch-select {
+/* Branch picker (Select.tsx trigger): fills the row, accent-colored like a
+ * live branch name. */
+.ww-select.git-branch-select {
   flex: 1;
   min-width: 0;
-  height: var(--ctl-h);
-  background: var(--panel);
   color: var(--accent);
   font-weight: 600;
-  border: 1px solid var(--border);
   border-radius: 7px;
-  /* Extra right padding reserves room for our own caret, not the browser's */
-  padding: 0 28px 0 8px;
-  font-size: 13px;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
 }
-.git-branch-caret {
-  position: absolute;
-  right: 9px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--fg-dim);
-  pointer-events: none;
-  display: flex;
-}
-.git-branch-caret svg { width: 12px; height: 12px; transform: rotate(90deg); }
 .git-branch-new {
   flex: none;
   width: var(--ctl-h);

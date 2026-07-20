@@ -6,6 +6,7 @@ import { formatVimMode, useVimMode, vimModeLetter } from '@/features/editor/vimM
 import { gitStatus } from '@/features/git/gitApi';
 import { gitKeys } from '@/features/git/gitKeys';
 import { bufferModeLabel, repoForBuffer } from '@/components/buffers/buffers';
+import { Select } from '@/components/Select';
 import { IconGit } from './icons';
 import type { RepoName, StatusInfo } from '@/lib/types';
 
@@ -61,16 +62,18 @@ export function ModeLine({ status, busy }: { status: StatusInfo | null; busy: bo
           {status.index.files} files
         </span>
       )}
-      <select
+      <Select
         className="ml-keymap"
+        align="right"
         value={keymap}
-        onChange={(e) => setKeymap(e.target.value as KeymapName)}
+        onChange={(k) => setKeymap(k as KeymapName)}
         title="Editor keymap"
-        aria-label="Editor keymap"
-      >
-        <option value="normal">Normal</option>
-        <option value="vim">Vim</option>
-      </select>
+        ariaLabel="Editor keymap"
+        options={[
+          { value: 'normal', label: 'Normal' },
+          { value: 'vim', label: 'Vim' },
+        ]}
+      />
       <span className={'ml-busy' + (busy ? ' active' : '')} title={busy ? 'AI working' : 'Idle'} />
     </div>
   );

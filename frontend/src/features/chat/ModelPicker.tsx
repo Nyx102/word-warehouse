@@ -1,4 +1,4 @@
-import { IconChevronDown } from '@/components/layout/icons';
+import { Select } from '@/components/Select';
 import type { ModelName } from '@/lib/types';
 
 const MODELS: { id: ModelName; label: string }[] = [
@@ -17,20 +17,15 @@ export function ModelPicker({ value, disabled, onChange }: {
   onChange: (m: ModelName) => void;
 }) {
   return (
-    <span className="model-select-wrap">
-      <select
-        className="model-select"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value as ModelName)}
-        aria-label="Model"
-        title={disabled ? 'Model locked while a turn is running' : 'Model'}
-      >
-        {MODELS.map((m) => (
-          <option key={m.id} value={m.id}>{m.label}</option>
-        ))}
-      </select>
-      <span className="model-caret"><IconChevronDown /></span>
-    </span>
+    <Select
+      className="model-select"
+      align="right"
+      value={value}
+      disabled={disabled}
+      onChange={(m) => onChange(m as ModelName)}
+      options={MODELS.map((m) => ({ value: m.id, label: m.label }))}
+      ariaLabel="Model"
+      title={disabled ? 'Model locked while a turn is running' : 'Model'}
+    />
   );
 }

@@ -151,34 +151,15 @@
  * together on the right. */
 .composer .field-bar { justify-content: flex-end; }
 
-/* Model dropdown in the composer bar: native select with our own caret (the
- * browser arrow is suppressed via appearance:none), matching the git branch
- * picker pattern. Sized to sit level with the 28px send button. */
-.model-select-wrap { position: relative; display: inline-flex; }
-.model-select {
+/* Model dropdown in the composer bar (Select.tsx trigger): compact, on the
+ * raised surface, sized to sit level with the 28px send button. */
+.ww-select.model-select {
   height: 28px;
+  padding: 0 10px;
   background: var(--raise);
-  color: var(--fg);
-  border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0 26px 0 10px;
   font-size: 12.5px;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
 }
-.model-select:hover:not(:disabled) { border-color: var(--accent); }
-.model-select:disabled { color: var(--fg-dim); }
-.model-caret {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--fg-dim);
-  pointer-events: none;
-  display: flex;
-}
-.model-caret svg { width: 13px; height: 13px; }
 
 /* Thread manager (sidebar section and in-panel drawer) */
 .thread-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }

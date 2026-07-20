@@ -166,18 +166,18 @@
   font-weight: 600;
 }
 
-.ml-keymap {
+.ww-select.ml-keymap {
   height: 22px;
-  padding: 0 4px;
+  padding: 0 6px;
   border-radius: 4px;
-  border: 1px solid var(--border);
   background: var(--bg-alt);
   color: var(--fg-dim);
   font-size: 11px;
   letter-spacing: 0.02em;
-  cursor: pointer;
+  gap: 4px;
 }
-.ml-keymap:hover { color: var(--fg); border-color: var(--fg-dim); }
+.ww-select.ml-keymap:hover:not(:disabled) { color: var(--fg); border-color: var(--fg-dim); }
+.ww-select.ml-keymap .ww-select-caret svg { width: 11px; height: 11px; }
 .ml-vim {
   width: 18px;
   height: 18px;
@@ -239,6 +239,7 @@
 }
 .sheet-row.linkish { color: inherit; }
 .sheet-row.linkish:hover { text-decoration: none; background: var(--accent-dim); }
+.sheet-row .ww-select { min-width: 108px; }
 .busy-note { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); }
 .sheet-close { margin-top: 12px; }
 
@@ -318,7 +319,7 @@
   .modeline { gap: 8px; padding: 0 8px; }
   .ml-index { display: none; }
 
-  .ml-keymap { font-size: 16px; height: 24px; }
+  .ww-select.ml-keymap { font-size: 12px; height: 26px; }
 
   .sheet-backdrop { align-items: flex-end; }
   .sheet { border-radius: 14px 14px 0 0; border-left: none; border-right: none; border-bottom: none; }

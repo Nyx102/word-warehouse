@@ -13,7 +13,7 @@
 }
 .ss-q { width: 100%; min-width: 0; }
 .ss-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.ss-grid select { width: 100%; min-width: 0; font-size: 12.5px; }
+.ss-grid .ww-select { width: 100%; min-width: 0; font-size: 12.5px; }
 .ss-actions { display: flex; align-items: center; gap: 6px; }
 .ss-align { display: inline-flex; align-items: center; gap: 6px; }
 .ss-align svg { width: 14px; height: 14px; flex: none; }
@@ -71,20 +71,6 @@
 
 /* Alignment buffer */
 .align-controls { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 14px 10px; align-items: center; }
-/* Series picker: own caret with padding reserved for it, like the git branch
- * select — the browser's native arrow is suppressed */
-.al-sel-wrap { position: relative; display: inline-flex; }
-.al-sel { padding: 0 28px 0 8px; appearance: none; -webkit-appearance: none; -moz-appearance: none; }
-.al-sel-caret {
-  position: absolute;
-  right: 9px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--fg-dim);
-  pointer-events: none;
-  display: flex;
-}
-.al-sel-caret svg { width: 12px; height: 12px; transform: rotate(90deg); }
 .align-results { padding: 0 14px 14px; overflow-x: auto; }
 .al-vol { margin: 12px 0 8px; font-size: 14px; color: var(--accent); }
 .al-row { display: flex; gap: 12px; align-items: flex-start; min-width: min-content; }
