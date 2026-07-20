@@ -9,6 +9,11 @@ Playwright drives / screenshots the running workbench (the app on `:8686`) from 
 - Pinned to **1.61.1** to match the host's Node 18. (The container runs Node 22, but
   Playwright runs host-side against the exposed port, so the host version is what matters.)
 
+> **Use it sparingly.** Reach for Playwright only when the outcome can't be reasoned out from
+> the source, or when someone wants to *see* the rendered result. For CSS/layout work, read the
+> `.css`/`.tsx` and do the math instead of screenshotting every step; a screenshot per
+> intermediate change is slow and usually unnecessary.
+
 ## Usage — the normal way
 
 Run anything from inside the repo; no `NODE_PATH` or `--no-install` tricks needed.
