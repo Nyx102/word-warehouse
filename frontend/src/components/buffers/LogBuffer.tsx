@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { useSettings } from '@/context/settings';
 import { useWorkspace } from '@/context/workspace';
 import { fmtWhen, repoLabel } from '@/features/git/fmt';
 import { gitLog } from '@/features/git/gitApi';
+import { gitKeys } from '@/features/git/gitKeys';
 import type { GitLogEntry, RepoName } from '@/lib/types';
 import { bufferId } from './buffers';
 
@@ -14,38 +16,30 @@ const PAGE = 30;
 export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null }) {
   const ws = useWorkspace();
   const { keymap } = useSettings();
-  const [entries, setEntries] = useState<GitLogEntry[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   // null = nothing pointed at yet; don't highlight a row until the user
   // actually clicks or presses a nav key
   const [point, setPoint] = useState<number | null>(null);
-  const seqRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const rowEls = useRef(new Map<number, HTMLDivElement>());
 
-  const loadPage = useCallback(async (skip: number) => {
-    const seq = ++seqRef.current;
-    setLoading(true);
-    try {
-      const r = await gitLog(repo, { n: PAGE, skip, path: path ?? null });
-      if (seq !== seqRef.current) return;
-      setEntries((prev) => (skip === 0 ? r.log : [...prev, ...r.log]));
-      setHasMore(r.has_more);
-      setError(null);
-    } catch (e) {
-      if (seq === seqRef.current) setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (seq === seqRef.current) setLoading(false);
-    }
-  }, [repo, path]);
+  // pageParam is the skip offset (0, PAGE, 2*PAGE, …); each page is the total
+  // rows loaded so far, so the next skip is that running count.
+  const q = useInfiniteQuery({
+    queryKey: gitKeys.log(repo, { path: path ?? null }),
+    queryFn: ({ pageParam }) => gitLog(repo, { n: PAGE, skip: pageParam, path: path ?? null }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.has_more ? pages.reduce((n, p) => n + p.log.length, 0) : undefined,
+    placeholderData: keepPreviousData, // keep the current list while a new repo/path loads
+  });
 
-  useEffect(() => {
-    setEntries([]);
-    setPoint(null);
-    void loadPage(0);
-  }, [loadPage]);
+  const entries: GitLogEntry[] = q.data?.pages.flatMap((p) => p.log) ?? [];
+  const hasMore = q.hasNextPage;
+  const loading = q.isFetching;
+  const error = q.error ? q.error.message : null;
+
+  // Roving point is an index into `entries`; a new repo/path is a new list.
+  useEffect(() => { setPoint(null); }, [repo, path]);
 
   useEffect(() => {
     if (point !== null) rowEls.current.get(point)?.scrollIntoView({ block: 'nearest' });
@@ -94,7 +88,7 @@ export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null
       </div>
       {error && (
         <div className="magit-error">
-          {error} <button className="btn btn-sm" onClick={() => void loadPage(0)}>Retry</button>
+          {error} <button className="btn btn-sm" onClick={() => void q.refetch()}>Retry</button>
         </div>
       )}
       <div className="log-body">
@@ -120,7 +114,7 @@ export function LogBuffer({ repo, path }: { repo: RepoName; path?: string | null
         )}
         {loading && <div className="empty">Loading…</div>}
         {hasMore && !loading && (
-          <button className="btn btn-sm log-more" onClick={() => void loadPage(entries.length)}>
+          <button className="btn btn-sm log-more" onClick={() => void q.fetchNextPage()}>
             Load more
           </button>
         )}

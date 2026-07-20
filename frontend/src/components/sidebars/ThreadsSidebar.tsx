@@ -1,8 +1,11 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useWorkspace } from '@/context/workspace';
+import { useThreadsContext } from '@/context/threads';
+import { useThreadMutations } from '@/features/chat/useThreadMutations';
 import { IconChevronRight } from '@/components/layout/icons';
-import type { ThreadsApi } from '@/features/chat/useThreads';
 import type { Thread, ThreadId } from '@/lib/types';
+
+type ThreadMutations = ReturnType<typeof useThreadMutations>;
 
 /** Epoch seconds -> compact age (now / 5m / 3h / 2d / 4w) */
 function relTime(v: number | null): string {
@@ -62,18 +65,19 @@ const IconTrash = () => (
  * middle, archived collapsed at the bottom. Selecting a thread reveals the
  * chat dock (forced full-screen on phones by CSS). Also reused inside the
  * chat panel's narrow-viewport drawer via onAfterSelect. */
-export function ThreadsSidebar({ threadsApi, onAfterSelect }: {
-  threadsApi: ThreadsApi;
+export function ThreadsSidebar({ onAfterSelect }: {
   onAfterSelect?: () => void;
 }) {
   const ws = useWorkspace();
+  const { threads, selectedId, select: selectThread, label } = useThreadsContext();
+  const mut = useThreadMutations();
   const [showArchived, setShowArchived] = useState(false);
   const [renamingId, setRenamingId] = useState<ThreadId | null>(null);
   const [menuId, setMenuId] = useState<ThreadId | null>(null);
 
-  const pinned = threadsApi.threads.filter((t) => t.pinned && !t.archived);
-  const main = threadsApi.threads.filter((t) => !t.pinned && !t.archived);
-  const archived = threadsApi.threads.filter((t) => t.archived);
+  const pinned = threads.filter((t) => t.pinned && !t.archived);
+  const main = threads.filter((t) => !t.pinned && !t.archived);
+  const archived = threads.filter((t) => t.archived);
 
   const afterSelect = () => {
     if (ws.chatDock === 'hidden') ws.setChatDock('docked');
@@ -82,20 +86,21 @@ export function ThreadsSidebar({ threadsApi, onAfterSelect }: {
   };
 
   const select = (id: ThreadId) => {
-    threadsApi.select(id);
+    selectThread(id);
     afterSelect();
   };
 
   const onNew = () => {
-    void threadsApi.create().then(afterSelect).catch(() => {});
+    void mut.create().then(afterSelect).catch(() => {});
   };
 
   const row = (t: Thread) => (
     <ThreadRow
       key={String(t.id)}
       t={t}
-      threadsApi={threadsApi}
-      active={t.id === threadsApi.selectedId}
+      label={label}
+      mut={mut}
+      active={t.id === selectedId}
       renaming={t.id === renamingId}
       menuOpen={t.id === menuId}
       onSelect={() => select(t.id)}
@@ -142,11 +147,12 @@ export function ThreadsSidebar({ threadsApi, onAfterSelect }: {
 }
 
 function ThreadRow({
-  t, threadsApi, active, renaming, menuOpen,
+  t, label, mut, active, renaming, menuOpen,
   onSelect, onStartRename, onCloseRename, onToggleMenu, onCloseMenu,
 }: {
   t: Thread;
-  threadsApi: ThreadsApi;
+  label: (t: Thread) => string;
+  mut: ThreadMutations;
   active: boolean;
   renaming: boolean;
   menuOpen: boolean;
@@ -156,20 +162,20 @@ function ThreadRow({
   onToggleMenu: () => void;
   onCloseMenu: () => void;
 }) {
-  const label = threadsApi.label(t);
+  const lbl = label(t);
   const isPinned = !!t.pinned;
   const isArchived = !!t.archived;
 
-  const doPin = () => void threadsApi.setPinned(t.id, !isPinned).catch(() => {});
-  const doArchive = () => void threadsApi.setArchived(t.id, !isArchived).catch(() => {});
+  const doPin = () => void mut.setPinned(t.id, !isPinned).catch(() => {});
+  const doArchive = () => void mut.setArchived(t.id, !isArchived).catch(() => {});
   const doDelete = () => {
-    if (window.confirm('Delete this thread?')) void threadsApi.remove(t.id).catch(() => {});
+    if (window.confirm('Delete this thread?')) void mut.remove(t.id).catch(() => {});
   };
 
   const commitRename = (value: string) => {
     const title = value.trim();
     onCloseRename();
-    if (title && title !== label) void threadsApi.rename(t.id, title).catch(() => {});
+    if (title && title !== lbl) void mut.rename(t.id, title).catch(() => {});
   };
 
   const onRenameKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -188,7 +194,7 @@ function ThreadRow({
       <li className="thread renaming">
         <input
           className="thread-rename"
-          defaultValue={label}
+          defaultValue={lbl}
           autoFocus
           aria-label="Thread title"
           onClick={(e) => e.stopPropagation()}
@@ -229,7 +235,7 @@ function ThreadRow({
       onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onSelect(); }}
     >
       <div className="thread-body">
-        <span className="thread-title" title={label}>{label}</span>
+        <span className="thread-title" title={lbl}>{lbl}</span>
         <span className="thread-meta">
           <span className="thread-time">{relTime(t.last_active ?? t.created_at)}</span>
           {t.model && <span className="thread-model">{t.model}</span>}

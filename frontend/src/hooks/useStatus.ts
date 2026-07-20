@@ -1,41 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { StatusInfo } from '@/lib/types';
 
-/** Poll /api/status every 10s; pauses while the browser tab is hidden. */
+/** Poll /api/status every 10s; pauses while the browser tab is hidden.
+ * Keeps the {status, refresh} shape so App and the drilled `status` prop to
+ * ModeLine/StatusSheet stay untouched. */
 export function useStatus(): { status: StatusInfo | null; refresh: () => void } {
-  const [status, setStatus] = useState<StatusInfo | null>(null);
-  const timerRef = useRef<number | null>(null);
-
-  const poll = useCallback(async () => {
-    try {
-      setStatus(await api<StatusInfo>('/api/status', { silent: true }));
-    } catch {
-      /* backend down; retry next tick */
-    }
-  }, []);
-
-  useEffect(() => {
-    const stop = () => {
-      if (timerRef.current != null) {
-        window.clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-    const start = () => {
-      stop();
-      void poll();
-      timerRef.current = window.setInterval(() => { void poll(); }, 10000);
-    };
-    const onVis = () => { if (document.hidden) stop(); else start(); };
-    start();
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      stop();
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, [poll]);
-
-  const refresh = useCallback(() => { void poll(); }, [poll]);
-  return { status, refresh };
+  const q = useQuery({
+    queryKey: ['status'],
+    queryFn: () => api<StatusInfo>('/api/status', { silent: true }),
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false, // pauses while the tab is hidden
+    retry: false,
+  });
+  return { status: q.data ?? null, refresh: () => void q.refetch() };
 }

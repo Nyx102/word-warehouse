@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useWorkspace } from '@/context/workspace';
 import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
@@ -28,26 +29,29 @@ export function AlignBuffer() {
   const ws = useWorkspace();
   const [series, setSeries] = useState('any');
   const [volume, setVolume] = useState('');
-  const [rows, setRows] = useState<AlignRow[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // The series/volume committed by the last Load press; null = never loaded.
+  const [submitted, setSubmitted] = useState<{ series: string; volume: string } | null>(null);
   const scroll = useKeyboardScroll(ws.activeId === 'align');
 
-  const load = async () => {
-    const params = new URLSearchParams();
-    if (series !== 'any') params.set('series', series);
-    if (volume.trim()) params.set('volume', volume.trim());
-    setLoading(true);
-    setFailed(false);
-    try {
-      const d = await api<{ rows: AlignRow[] }>('/api/align?' + params.toString());
-      setRows(d.rows || []);
-    } catch {
-      setFailed(true);
-      setRows(null);
-    } finally {
-      setLoading(false);
-    }
+  const align = useQuery({
+    queryKey: ['align', submitted?.series, submitted?.volume],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (submitted!.series !== 'any') params.set('series', submitted!.series);
+      if (submitted!.volume) params.set('volume', submitted!.volume);
+      return api<{ rows: AlignRow[] }>('/api/align?' + params.toString());
+    },
+    enabled: submitted != null,
+    placeholderData: keepPreviousData, // keep the current matrix while a new one loads
+  });
+  const failed = align.isError;
+  // Clear the matrix on failure to match the old load()'s setRows(null); a
+  // background reload keeps the previous matrix via keepPreviousData.
+  const rows = failed ? null : (align.data?.rows ?? null);
+  const loading = align.isFetching;
+
+  const load = () => {
+    setSubmitted({ series, volume: volume.trim() });
   };
 
   // volume -> (source/lang key -> column)
@@ -83,9 +87,9 @@ export function AlignBuffer() {
           placeholder="volume (blank = all)"
           size={16}
           onChange={(e) => setVolume(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void load(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) load(); }}
         />
-        <button className="btn" onClick={() => void load()} disabled={loading}>
+        <button className="btn" onClick={() => load()} disabled={loading}>
           {loading ? 'Loading…' : 'Load alignment'}
         </button>
       </div>

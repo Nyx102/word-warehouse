@@ -1,53 +1,51 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { IconChevronRight, IconFile, IconFolder } from '@/components/layout/icons';
 import type { DirEntry } from '@/lib/types';
 
-interface NodeState { entries: DirEntry[]; loading: boolean; error?: boolean; }
+interface NodeState { entries: DirEntry[]; loading: boolean; error: boolean; }
 
-/** Lazy, per-directory file tree over /api/fs/list. Directories load their
- * children on first expand; `refreshKey` bumps re-list the root + open dirs.
- * `onMenu` (kebab click or right-click) receives viewport coordinates for a
- * caller-rendered context menu. */
-export function FileTree({ selected, onSelect, onMenu, refreshKey }: {
+/** Lazy, per-directory file tree over /api/fs/list. Each visible directory is
+ * one ['fs','list',path] query; expanding a dir mounts its query, collapsing
+ * drops it. FS mutations invalidate ['fs','list'] to re-list the root and every
+ * open dir at once. `onMenu` (kebab click or right-click) receives viewport
+ * coordinates for a caller-rendered context menu. */
+export function FileTree({ selected, onSelect, onMenu }: {
   selected: string | null;
   onSelect: (entry: DirEntry) => void;
   onMenu?: (entry: DirEntry, x: number, y: number) => void;
-  refreshKey: number;
 }) {
-  const [dirs, setDirs] = useState<Record<string, NodeState>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const expandedRef = useRef<Set<string>>(new Set());
-  expandedRef.current = expanded;
 
-  const loadDir = useCallback(async (path: string) => {
-    setDirs((d) => ({ ...d, [path]: { entries: d[path]?.entries ?? [], loading: true } }));
-    try {
-      const r = await api<{ entries: DirEntry[] }>(
-        `/api/fs/list?path=${encodeURIComponent(path)}`, { silent: true });
-      setDirs((d) => ({ ...d, [path]: { entries: r.entries, loading: false } }));
-    } catch {
-      setDirs((d) => ({ ...d, [path]: { entries: [], loading: false, error: true } }));
-    }
-  }, []);
+  // The root plus every currently-expanded directory; useQueries takes this
+  // dynamic array and keeps one cache entry per path.
+  const paths = useMemo(() => ['', ...expanded], [expanded]);
+  const results = useQueries({
+    queries: paths.map((p) => ({
+      queryKey: ['fs', 'list', p],
+      queryFn: () =>
+        api<{ entries: DirEntry[] }>(`/api/fs/list?path=${encodeURIComponent(p)}`, { silent: true }),
+    })),
+  });
+  const nodeFor = (path: string): NodeState | null => {
+    const i = paths.indexOf(path);
+    if (i === -1) return null;
+    const q = results[i];
+    return { entries: q.data?.entries ?? [], loading: q.isFetching, error: q.isError };
+  };
 
-  // (Re)load the root and any currently-expanded dirs when refreshKey changes
-  useEffect(() => {
-    void loadDir('');
-    expandedRef.current.forEach((p) => void loadDir(p));
-  }, [loadDir, refreshKey]);
-
-  const toggle = useCallback((path: string) => {
+  const toggle = (path: string) => {
     setExpanded((exp) => {
       const n = new Set(exp);
       if (n.has(path)) n.delete(path);
-      else { n.add(path); if (!dirs[path]) void loadDir(path); }
+      else n.add(path); // adding mounts the ['fs','list',path] query -> lazy load
       return n;
     });
-  }, [dirs, loadDir]);
+  };
 
   const renderDir = (path: string): ReactNode => {
-    const node = dirs[path];
+    const node = nodeFor(path);
     if (!node) return null;
     if (node.error) return <div className="tree-msg">failed to load</div>;
     return node.entries.map((e) => {
@@ -90,7 +88,7 @@ export function FileTree({ selected, onSelect, onMenu, refreshKey }: {
     });
   };
 
-  const root = dirs[''];
+  const root = nodeFor('');
   return (
     <div className="file-tree">
       {!root || (root.loading && !root.entries.length)

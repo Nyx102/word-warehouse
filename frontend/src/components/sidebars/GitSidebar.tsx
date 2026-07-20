@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkspace } from '@/context/workspace';
-import { useAsync } from '@/hooks/useAsync';
 import { toast } from '@/components/Toasts';
 import { fileLabel, repoLabel, statusClass } from '@/features/git/fmt';
-import { gitBranches, gitStatus, gitSwitchBranch, onGitMutate } from '@/features/git/gitApi';
+import { gitBranches, gitStatus } from '@/features/git/gitApi';
+import { gitKeys } from '@/features/git/gitKeys';
+import { useGitMutations } from '@/features/git/useGitMutations';
 import { IconChevronRight, IconGit, IconHistory } from '@/components/layout/icons';
 import type { GitStatusFile, RepoName } from '@/lib/types';
 
@@ -21,21 +23,27 @@ export function GitSidebar() {
   const [newBranch, setNewBranch] = useState('');
   const [switching, setSwitching] = useState(false);
 
-  const status = useAsync(() => gitStatus(repo), [repo]);
-  const branches = useAsync(() => gitBranches(repo), [repo]);
-  const statusReload = status.reload;
-  const branchesReload = branches.reload;
-  const reloadAll = useCallback(() => {
-    statusReload();
-    branchesReload();
-  }, [statusReload, branchesReload]);
+  const status = useQuery({
+    queryKey: gitKeys.status(repo),
+    queryFn: () => gitStatus(repo),
+  });
+  const branches = useQuery({
+    queryKey: gitKeys.branches(repo),
+    queryFn: () => gitBranches(repo),
+  });
+  const git = useGitMutations(repo);
 
-  useEffect(() => onGitMutate((r) => { if (r === repo) reloadAll(); }), [repo, reloadAll]);
+  // Mutations invalidate ['git', repo] (refreshing both queries) and the
+  // QueryClient's refetchOnWindowFocus covers the old window-focus resync.
+  // Re-opening the Git section still forces a fresh read of the two cheap
+  // queries.
   useEffect(() => {
-    window.addEventListener('focus', reloadAll);
-    return () => window.removeEventListener('focus', reloadAll);
-  }, [reloadAll]);
-  useEffect(() => { if (ws.rail === 'git') reloadAll(); }, [ws.rail, reloadAll]);
+    if (ws.rail === 'git') {
+      void status.refetch();
+      void branches.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.rail]);
 
   const openStatus = () => { ws.open({ kind: 'magit', repo }); ws.setDrawerOpen(false); };
   const openLog = () => { ws.open({ kind: 'log', repo }); ws.setDrawerOpen(false); };
@@ -50,21 +58,21 @@ export function GitSidebar() {
   const doSwitch = async (name: string) => {
     if (!name || name === branches.data?.current || switching) return;
     setSwitching(true);
-    const r = await gitSwitchBranch(repo, name);
+    const r = await git.switchBranch(name);
     setSwitching(false);
     if (r.ok) {
       toast('Switched to ' + name, 'ok');
       openStatus();
     }
-    // Conflict path (409 toasted by api) still needs a resync
-    reloadAll();
+    // Conflict path (409 toasted by api) resyncs via the mutation's onSettled
+    // invalidation of ['git', repo].
   };
 
   const doCreate = async () => {
     const name = newBranch.trim();
     if (!name || switching) return;
     setSwitching(true);
-    const r = await gitSwitchBranch(repo, name, true);
+    const r = await git.switchBranch(name, true);
     setSwitching(false);
     if (r.ok) {
       toast('Created ' + name, 'ok');
@@ -72,7 +80,6 @@ export function GitSidebar() {
       setNewBranch('');
       openStatus();
     }
-    reloadAll();
   };
 
   const files = status.data?.files ?? [];

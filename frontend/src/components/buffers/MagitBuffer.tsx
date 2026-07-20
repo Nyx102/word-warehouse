@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useSettings } from '@/context/settings';
 import { useWorkspace } from '@/context/workspace';
 import { toast } from '@/components/Toasts';
@@ -13,17 +14,14 @@ import {
 import { fileLabel, fmtWhen, repoLabel, statusChar, statusClass, type GitSection } from '@/features/git/fmt';
 import { IconChevronRight } from '@/components/layout/icons';
 import {
-  gitApply,
-  gitCommitStaged,
   gitDiffText,
   gitLog,
-  gitStage,
   gitStatus,
-  gitUnstage,
-  onGitMutate,
   repoFsPath,
   type GitMutateResult,
 } from '@/features/git/gitApi';
+import { gitKeys } from '@/features/git/gitKeys';
+import { useGitMutations } from '@/features/git/useGitMutations';
 import type { GitLogEntry, GitStatusFile, GitStatusResponse, RepoName } from '@/lib/types';
 
 interface Data {
@@ -63,48 +61,42 @@ const byPath = (files: DiffFile[]) => new Map(files.map((f) => [f.path, f]));
 export function MagitBuffer({ repo }: { repo: RepoName }) {
   const ws = useWorkspace();
   const { keymap } = useSettings();
-  const [data, setData] = useState<Data | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pointKey, setPointKey] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
-  const seqRef = useRef(0);
   const lastIdxRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const commitRef = useRef<HTMLTextAreaElement>(null);
   const rowEls = useRef(new Map<string, HTMLDivElement>());
 
-  const refetch = useCallback(async () => {
-    const seq = ++seqRef.current;
-    setLoading(true);
-    try {
+  // One composite key holds the atomic 4-way snapshot; react-query's own
+  // request bookkeeping replaces the old seqRef out-of-order guard. Any git
+  // mutation invalidates ['git', repo], which prefix-matches this key.
+  const q = useQuery({
+    queryKey: gitKeys.magit(repo),
+    queryFn: async (): Promise<Data> => {
       const [status, logRes, wt, st] = await Promise.all([
         gitStatus(repo),
         gitLog(repo, { n: 10 }),
         gitDiffText(repo, { mode: 'worktree' }),
         gitDiffText(repo, { mode: 'staged' }),
       ]);
-      if (seq !== seqRef.current) return;
-      setData({
+      return {
         status,
         log: logRes.log,
         worktree: byPath(parseDiff(wt).files),
         staged: byPath(parseDiff(st).files),
-      });
-      setError(null);
-    } catch (e) {
-      if (seq === seqRef.current) setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (seq === seqRef.current) setLoading(false);
-    }
-  }, [repo]);
+      };
+    },
+  });
+  const git = useGitMutations(repo);
+  const data = q.data ?? null;
+  const loading = q.isFetching;
+  const error = q.error ? q.error.message : null;
+  const refetch = q.refetch;
 
-  useEffect(() => { void refetch(); }, [refetch]);
-  // Any successful mutation (here, sidebar, diff buffer) refreshes this view
-  useEffect(() => onGitMutate((r) => { if (r === repo) void refetch(); }), [repo, refetch]);
-  // Re-poll cheap reads whenever the buffer becomes the active tab
+  // Re-poll whenever the buffer becomes the active tab
   const active = ws.activeId === 'magit:' + repo;
   useEffect(() => { if (active) void refetch(); }, [active, refetch]);
   // Buffers stay mounted (CSS-hidden) across tab switches, so keyboard nav
@@ -185,29 +177,29 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   const run = useCallback(async (key: string, fn: () => Promise<GitMutateResult>) => {
     setBusy(key);
     try {
-      const r = await fn();
-      // Success refetches via the mutation broadcast; failure resyncs here
-      if (!r.ok) await refetch();
+      // Both the success refresh and any failure resync come from the
+      // mutation's onSettled invalidation of ['git', repo].
+      await fn();
     } finally {
       setBusy(null);
     }
-  }, [refetch]);
+  }, []);
 
   const stageAt = (row: Row) => {
     if (busy) return;
     if (row.type === 'file' && row.section !== 'staged') {
-      void run(row.key, () => gitStage(repo, [row.entry.path]));
+      void run(row.key, () => git.stage([row.entry.path]));
     } else if (row.type === 'hunk' && row.section === 'unstaged') {
-      void run(row.key, () => gitApply(repo, buildHunkPatch(row.file, row.hunk)));
+      void run(row.key, () => git.apply(buildHunkPatch(row.file, row.hunk)));
     }
   };
 
   const unstageAt = (row: Row) => {
     if (busy) return;
     if (row.type === 'file' && row.section === 'staged') {
-      void run(row.key, () => gitUnstage(repo, [row.entry.path]));
+      void run(row.key, () => git.unstage([row.entry.path]));
     } else if (row.type === 'hunk' && row.section === 'staged') {
-      void run(row.key, () => gitApply(repo, buildHunkPatch(row.file, row.hunk), true));
+      void run(row.key, () => git.apply(buildHunkPatch(row.file, row.hunk), true));
     }
   };
 
@@ -233,13 +225,12 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
     const message = msg.trim();
     setBusy('commit');
     try {
-      const r = await gitCommitStaged(repo, message);
+      const r = await git.commit(message);
       if (r.ok) {
         toast(`Committed ${r.hash ?? ''}`.trim(), 'ok');
         setMsg('');
-      } else {
-        await refetch();
       }
+      // Failure resyncs via the mutation's onSettled invalidation.
     } finally {
       setBusy(null);
     }

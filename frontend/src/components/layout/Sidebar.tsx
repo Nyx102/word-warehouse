@@ -6,7 +6,6 @@ import { SearchSidebar } from '@/components/sidebars/SearchSidebar';
 import { GitSidebar } from '@/components/sidebars/GitSidebar';
 import { FlagsSidebar } from '@/components/sidebars/FlagsSidebar';
 import { ThreadsSidebar } from '@/components/sidebars/ThreadsSidebar';
-import type { ThreadsApi } from '@/features/chat/useThreads';
 
 const LABELS: Record<RailSection, string> = {
   files: 'Files',
@@ -20,7 +19,7 @@ const LABELS: Record<RailSection, string> = {
  * inactive) so tree expansion and list state survive section switches. Inline
  * column on desktop, overlay drawer below 1024px; both are the same DOM node
  * so nothing remounts when the viewport crosses the breakpoint. */
-export function Sidebar({ threadsApi }: { threadsApi: ThreadsApi }) {
+export function Sidebar() {
   const ws = useWorkspace();
   // Drag-to-resize only applies to the inline desktop column; below 1024px the
   // sidebar is a fixed-width overlay drawer, so the handle stays hidden there.
@@ -42,7 +41,7 @@ export function Sidebar({ threadsApi }: { threadsApi: ThreadsApi }) {
     { id: 'search', body: <SearchSidebar /> },
     { id: 'git', body: <GitSidebar /> },
     { id: 'flags', body: <FlagsSidebar /> },
-    { id: 'chat', body: <ThreadsSidebar threadsApi={threadsApi} /> },
+    { id: 'chat', body: <ThreadsSidebar /> },
   ];
   return (
     <>

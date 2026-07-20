@@ -2,18 +2,18 @@ import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { ChatPanel } from './ChatPanel';
 import { useMediaQuery } from '@/lib/util';
 import { useWorkspace } from '@/context/workspace';
+import { useThreadsContext } from '@/context/threads';
 import { IconDockRight, IconExpand } from '@/components/layout/icons';
-import type { ThreadsApi } from './useThreads';
 
 /** The chat host: ONE permanent subtree whose hidden/docked/full placement is
  * pure CSS, so the SSE stream and scroll position survive every toggle.
  * Docked width is draggable via the left-edge handle; phones render docked
  * as full-screen (CSS) and hide the expand control. */
-export function ChatDock({ threadsApi, onTurnActiveChange }: {
-  threadsApi: ThreadsApi;
+export function ChatDock({ onTurnActiveChange }: {
   onTurnActiveChange: (on: boolean) => void;
 }) {
   const ws = useWorkspace();
+  const threads = useThreadsContext();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
@@ -28,7 +28,7 @@ export function ChatDock({ threadsApi, onTurnActiveChange }: {
   };
   const onHandleUp = () => { dragRef.current = null; };
 
-  const title = threadsApi.selected ? threadsApi.label(threadsApi.selected) : 'New chat';
+  const title = threads.selected ? threads.label(threads.selected) : 'New chat';
 
   return (
     <aside
@@ -64,7 +64,7 @@ export function ChatDock({ threadsApi, onTurnActiveChange }: {
           onClick={() => ws.setChatDock('hidden')}
         >×</button>
       </div>
-      <ChatPanel threadsApi={threadsApi} onTurnActiveChange={onTurnActiveChange} />
+      <ChatPanel onTurnActiveChange={onTurnActiveChange} />
     </aside>
   );
 }

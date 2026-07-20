@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkspace } from '@/context/workspace';
 import { bufferId } from './buffers';
-import { useAsync } from '@/hooks/useAsync';
 import { MergeEditor } from '@/features/editor/MergeEditor';
-import {
-  gitStage,
-  gitStatus,
-  gitUnstage,
-  notifyGitChanged,
-  onGitMutate,
-  type GitMutateResult,
-} from '@/features/git/gitApi';
+import { gitStatus, type GitMutateResult } from '@/features/git/gitApi';
+import { gitKeys } from '@/features/git/gitKeys';
+import { useGitMutations } from '@/features/git/useGitMutations';
+import { queryClient } from '@/lib/queryClient';
 import type { RepoName } from '@/lib/types';
 
 /** Single-file diff/edit buffer: the shared MergeEditor (HEAD vs worktree,
@@ -20,25 +16,24 @@ export function DiffBuffer({ repo, path, line }: { repo: RepoName; path: string;
   const ws = useWorkspace();
   const id = useMemo(() => bufferId({ kind: 'diff', repo, path }), [repo, path]);
   const active = ws.activeId === id;
-  const status = useAsync(() => gitStatus(repo), [repo]);
+  const status = useQuery({
+    queryKey: gitKeys.status(repo),
+    queryFn: () => gitStatus(repo),
+  });
+  const git = useGitMutations(repo);
   const [busy, setBusy] = useState(false);
-
-  useEffect(
-    () => onGitMutate((r) => { if (r === repo) status.reload(); }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [repo, status.reload],
-  );
 
   const entry = status.data?.files.find((f) => f.path === path) ?? null;
   const stageable = !!entry && (entry.untracked || entry.worktree !== '');
   const unstageable = !!entry && !entry.untracked && entry.index !== '';
 
+  // The mutations invalidate ['git', repo] onSettled, so both the success
+  // refresh and any failure resync happen automatically; this just tracks the
+  // in-flight button-disable state.
   const act = async (fn: () => Promise<GitMutateResult>) => {
     setBusy(true);
     try {
-      const r = await fn();
-      // Success reloads via the mutation broadcast; failure resyncs here
-      if (!r.ok) status.reload();
+      await fn();
     } finally {
       setBusy(false);
     }
@@ -55,13 +50,13 @@ export function DiffBuffer({ repo, path, line }: { repo: RepoName; path: string;
         <button
           className="btn btn-sm"
           disabled={busy || !stageable}
-          onClick={() => void act(() => gitStage(repo, [path]))}
+          onClick={() => void act(() => git.stage([path]))}
           title="Stage the whole file"
         >Stage file</button>
         <button
           className="btn btn-sm"
           disabled={busy || !unstageable}
-          onClick={() => void act(() => gitUnstage(repo, [path]))}
+          onClick={() => void act(() => git.unstage([path]))}
           title="Unstage the whole file (index only)"
         >Unstage file</button>
         <span className="toolbar-spacer" />
@@ -74,7 +69,7 @@ export function DiffBuffer({ repo, path, line }: { repo: RepoName; path: string;
         status={entry?.status ?? ''}
         gotoLine={line ?? null}
         active={active}
-        onChanged={() => notifyGitChanged(repo)}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey: gitKeys.all(repo) })}
         onClose={() => ws.close(id)}
       />
     </div>

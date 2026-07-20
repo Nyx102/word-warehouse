@@ -1,13 +1,13 @@
-import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkspace } from '@/context/workspace';
 import { useSettings, type KeymapName } from '@/context/settings';
-import { useAsync } from '@/hooks/useAsync';
 import { useCursorPos } from '@/features/editor/cursorStore';
 import { formatVimMode, useVimMode, vimModeLetter } from '@/features/editor/vimModeStore';
-import { gitStatus, onGitMutate } from '@/features/git/gitApi';
+import { gitStatus } from '@/features/git/gitApi';
+import { gitKeys } from '@/features/git/gitKeys';
 import { bufferModeLabel, repoForBuffer } from '@/components/buffers/buffers';
 import { IconGit } from './icons';
-import type { StatusInfo } from '@/lib/types';
+import type { RepoName, StatusInfo } from '@/lib/types';
 
 /** Global modeline: always mounted, one row, independent of buffer kind or
  * editor keymap. Shows what's open, where the cursor is, the relevant repo's
@@ -22,15 +22,14 @@ export function ModeLine({ status, busy }: { status: StatusInfo | null; busy: bo
   const desc = active?.desc ?? null;
   const repo = desc ? repoForBuffer(desc) : null;
 
-  const branch = useAsync(
-    () => (repo ? gitStatus(repo) : Promise.resolve(null)),
-    [repo],
-  );
-  const reloadBranch = branch.reload;
-  useEffect(() => {
-    if (!repo) return;
-    return onGitMutate((r) => { if (r === repo) reloadBranch(); });
-  }, [repo, reloadBranch]);
+  // Git mutations invalidate ['git', repo] (see useGitMutations), which
+  // prefix-matches this ['git', repo, 'status'] key, so the branch readout
+  // refreshes without a manual subscription.
+  const branch = useQuery({
+    queryKey: repo ? gitKeys.status(repo) : ['git', 'none', 'status'],
+    queryFn: () => gitStatus(repo as RepoName),
+    enabled: !!repo,
+  });
 
   return (
     <div className="modeline mono">

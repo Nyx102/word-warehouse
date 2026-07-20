@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { flagIdent } from './FlagCard';
 import type { ClearedFlag } from './AiDismissedSection';
@@ -12,7 +13,6 @@ export interface LintApi {
   busyKeys: Set<string>;
   visibleFiles: { path: string; flags: LintFlag[] }[];
   cleared: ClearedFlag[];
-  load: (silent?: boolean) => Promise<void>;
   rerun: () => Promise<void>;
   triageNow: () => Promise<void>;
   isDismissed: (f: LintFlag) => boolean;
@@ -20,119 +20,118 @@ export interface LintApi {
   restore: (f: LintFlag) => Promise<void>;
 }
 
-/** Lint report state for the Flags sidebar: fetch + reload, optimistic
- * dismiss/undismiss, triage restore, the 10s pending-triage poll, and the
- * visible/AI-cleared split. `active` gates the initial fetch (nothing loads
- * until the section is first shown) and triggers a silent refresh on
- * re-activation. */
+/** Lint report state for the Flags sidebar: fetch (react-query, keyed on
+ * scope+dismissed), optimistic dismiss/undismiss, triage restore, the 10s
+ * pending-triage poll (a conditional refetchInterval), and the visible/AI-
+ * cleared split. `active` gates the initial fetch (nothing loads until the
+ * section is first shown) and triggers a refresh on re-activation. */
 export function useLint(scope: LintScope, showDismissed: boolean, active: boolean): LintApi {
-  const [report, setReport] = useState<LintReport | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [rerunning, setRerunning] = useState(false);
-  const [triaging, setTriaging] = useState(false);
+  const qc = useQueryClient();
   // Optimistic dismissed-state overrides: ident -> dismissed?
   const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
+  const overridesRef = useRef(overrides);
+  overridesRef.current = overrides;
   const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
   const [armed, setArmed] = useState(active);
-  const reqRef = useRef(0);
 
-  const load = useCallback(async (silent = false) => {
-    const n = ++reqRef.current;
-    if (!silent) setLoading(true);
-    try {
-      const url = `/api/lint?scope=${scope}` + (showDismissed ? '&include_dismissed=1' : '');
-      const d = await api<LintReport>(url, { silent });
-      if (reqRef.current === n) {
-        setReport(d);
-        setOverrides(new Map());
-      }
-    } catch {
-      /* toast unless silent */
-    } finally {
-      if (reqRef.current === n) setLoading(false);
-    }
-  }, [scope, showDismissed]);
+  const q = useQuery({
+    queryKey: ['lint', scope, showDismissed],
+    // Silent so the 10s triage poll can't spew a toast every tick on failure.
+    queryFn: () =>
+      api<LintReport>(`/api/lint?scope=${scope}` + (showDismissed ? '&include_dismissed=1' : ''), {
+        silent: true,
+      }),
+    enabled: armed,
+    // Poll while triage has flags to work through, but stop if it reported an
+    // error (the server won't auto-retry until backoff clears) so the spinner
+    // can't spin forever. "Triage now" is the manual escape hatch.
+    refetchInterval: (query) => {
+      const d = query.state.data;
+      return d?.triage_pending && !d?.triage?.last_error ? 10_000 : false;
+    },
+  });
+  const report = q.data ?? null;
+  const loading = q.isFetching;
+
+  const invalidateLint = useCallback(
+    () => { void qc.invalidateQueries({ queryKey: ['lint'] }); },
+    [qc],
+  );
 
   useEffect(() => { if (active) setArmed(true); }, [active]);
-  useEffect(() => { if (armed) void load(); }, [armed, load]);
 
-  // Silently refresh when the section is re-activated with data already loaded
-  const hadDataRef = useRef(false);
+  // Fresh server data supersedes the optimistic overrides.
   useEffect(() => {
-    if (active && hadDataRef.current) void load(true);
+    if (q.data && overridesRef.current.size > 0) setOverrides(new Map());
+  }, [q.data]);
+
+  // Silently refresh when the section is re-activated with data already armed;
+  // the first activation is handled by `armed` flipping the query on.
+  useEffect(() => {
+    if (active && armed) void q.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
-  useEffect(() => { if (report) hadDataRef.current = true; }, [report]);
 
-  // Poll while triage has flags to work through, but stop if it reported an
-  // error (the server won't auto-retry until backoff clears), so the spinner
-  // can't spin forever. "Triage now" is the manual escape hatch.
-  const triageErr = report?.triage?.last_error;
-  useEffect(() => {
-    if (!report?.triage_pending || triageErr) return;
-    const t = window.setInterval(() => { void load(true); }, 10000);
-    return () => window.clearInterval(t);
-  }, [report?.triage_pending, triageErr, load]);
-
+  const rerunMut = useMutation({
+    mutationFn: () => api('/api/reindex', { method: 'POST', body: {} }),
+    onSuccess: invalidateLint,
+  });
   const rerun = useCallback(async () => {
-    setRerunning(true);
-    try {
-      await api('/api/reindex', { method: 'POST', body: {} });
-      await load();
-    } catch {
-      /* toast shown */
-    } finally {
-      setRerunning(false);
-    }
-  }, [load]);
+    await rerunMut.mutateAsync().catch(() => { /* toast shown */ });
+  }, [rerunMut]);
 
+  const triageMut = useMutation({
+    mutationFn: () => api('/api/triage/run', { method: 'POST', body: {} }),
+    onSuccess: invalidateLint,
+  });
   const triageNow = useCallback(async () => {
-    setTriaging(true);
-    try {
-      await api('/api/triage/run', { method: 'POST', body: {} });
-      await load(true);
-    } catch {
-      /* toast shown */
-    } finally {
-      setTriaging(false);
-    }
-  }, [load]);
+    await triageMut.mutateAsync().catch(() => { /* toast shown */ });
+  }, [triageMut]);
 
   const isDismissed = useCallback(
     (f: LintFlag) => overrides.get(flagIdent(f)) ?? !!f.dismissed,
     [overrides],
   );
 
+  // Optimistic flip in onMutate; revert in onError. Only pull the server's
+  // dismissed state back in when the dismissed rows are actually on screen.
+  const dismissMut = useMutation({
+    mutationFn: (v: { flag: LintFlag; was: boolean }) =>
+      api('/api/lint/' + (v.was ? 'undismiss' : 'dismiss'), {
+        method: 'POST',
+        body: { category: v.flag.category, key: v.flag.key },
+      }),
+    onMutate: (v) => {
+      const key = flagIdent(v.flag);
+      setOverrides((m) => new Map(m).set(key, !v.was));
+      return { key, was: v.was };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx) setOverrides((m) => new Map(m).set(ctx.key, ctx.was));
+    },
+    onSuccess: () => { if (showDismissed) invalidateLint(); },
+  });
   const toggleDismiss = useCallback(async (flag: LintFlag) => {
-    const key = flagIdent(flag);
-    const was = overrides.get(key) ?? !!flag.dismissed;
-    setOverrides((m) => new Map(m).set(key, !was)); // optimistic flip
-    try {
-      await api('/api/lint/' + (was ? 'undismiss' : 'dismiss'), {
-        method: 'POST',
-        body: { category: flag.category, key: flag.key },
-      });
-      if (showDismissed) void load(true); // pick up the server's dismissed state
-    } catch {
-      setOverrides((m) => new Map(m).set(key, was)); // revert
-    }
-  }, [overrides, showDismissed, load]);
+    const was = overridesRef.current.get(flagIdent(flag)) ?? !!flag.dismissed;
+    await dismissMut.mutateAsync({ flag, was }).catch(() => { /* reverted in onError */ });
+  }, [dismissMut]);
 
+  const restoreMut = useMutation({
+    mutationFn: (flag: LintFlag) =>
+      api('/api/triage/reject', { method: 'POST', body: { category: flag.category, key: flag.key } }),
+    onMutate: (flag) => {
+      const key = flagIdent(flag);
+      setBusyKeys((s) => new Set(s).add(key));
+      return { key };
+    },
+    onSettled: (_d, _e, _flag, ctx) => {
+      if (ctx) setBusyKeys((s) => { const n = new Set(s); n.delete(ctx.key); return n; });
+    },
+    onSuccess: invalidateLint,
+  });
   const restore = useCallback(async (flag: LintFlag) => {
-    const key = flagIdent(flag);
-    setBusyKeys((s) => new Set(s).add(key));
-    try {
-      await api('/api/triage/reject', {
-        method: 'POST',
-        body: { category: flag.category, key: flag.key },
-      });
-      await load();
-    } catch {
-      /* toast shown */
-    } finally {
-      setBusyKeys((s) => { const n = new Set(s); n.delete(key); return n; });
-    }
-  }, [load]);
+    await restoreMut.mutateAsync(flag).catch(() => { /* toast shown */ });
+  }, [restoreMut]);
 
   // Split each file's flags: AI-cleared ones sink to the bottom section
   const cleared: ClearedFlag[] = [];
@@ -156,7 +155,17 @@ export function useLint(scope: LintScope, showDismissed: boolean, active: boolea
     .filter((f) => f.flags.length > 0);
 
   return {
-    report, loading, rerunning, triaging, busyKeys, visibleFiles, cleared,
-    load, rerun, triageNow, isDismissed, toggleDismiss, restore,
+    report,
+    loading,
+    rerunning: rerunMut.isPending,
+    triaging: triageMut.isPending,
+    busyKeys,
+    visibleFiles,
+    cleared,
+    rerun,
+    triageNow,
+    isDismissed,
+    toggleDismiss,
+    restore,
   };
 }

@@ -1,9 +1,10 @@
 import { useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkspace } from '@/context/workspace';
-import { useAsync } from '@/hooks/useAsync';
 import { ReadOnlyEditor, type ReadOnlyHandle } from '@/features/editor/ReadOnlyEditor';
 import { buildFilePatch, parseDiff } from '@/features/git/diffParse';
 import { gitShow } from '@/features/git/gitApi';
+import { gitKeys } from '@/features/git/gitKeys';
 import { bufferId } from './buffers';
 import type { RepoName } from '@/lib/types';
 
@@ -29,7 +30,11 @@ function joinPatch(patches: string[]): { text: string; starts: number[] } {
 export function CommitBuffer({ repo, rev }: { repo: RepoName; rev: string }) {
   const ws = useWorkspace();
   const active = ws.activeId === bufferId({ kind: 'commit', repo, rev });
-  const detail = useAsync(() => gitShow(repo, rev), [repo, rev]);
+  const detail = useQuery({
+    queryKey: gitKeys.show(repo, rev),
+    queryFn: () => gitShow(repo, rev),
+    staleTime: Infinity, // a concrete SHA's contents never change
+  });
   const patch = useMemo(() => {
     if (!detail.data) return { text: '', starts: [] as number[] };
     return joinPatch(parseDiff(detail.data.patch).files.map(buildFilePatch));
@@ -40,7 +45,7 @@ export function CommitBuffer({ repo, rev }: { repo: RepoName; rev: string }) {
     return (
       <div className="commit-buffer">
         <div className="magit-error">
-          {detail.error.message} <button className="btn btn-sm" onClick={detail.reload}>Retry</button>
+          {detail.error.message} <button className="btn btn-sm" onClick={() => void detail.refetch()}>Retry</button>
         </div>
       </div>
     );

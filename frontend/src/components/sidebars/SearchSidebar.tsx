@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useWorkspace } from '@/context/workspace';
 import { ChunkModal } from '@/features/search/ChunkModal';
@@ -20,11 +21,20 @@ export function SearchSidebar() {
   const [source, setSource] = useState('any');
   const [kind, setKind] = useState('body');
   const [limit, setLimit] = useState('30');
-  const [results, setResults] = useState<SearchResult[] | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // The query string committed by the last Search press; null = never searched.
+  const [submitted, setSubmitted] = useState<string | null>(null);
   const [fileModal, setFileModal] = useState<{ path: string; start: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const search = useQuery({
+    queryKey: ['search', submitted],
+    queryFn: () => api<{ results: SearchResult[] }>('/api/search?' + submitted),
+    enabled: submitted != null,
+    placeholderData: keepPreviousData, // don't blank the list while a new search loads
+  });
+  const results = search.data?.results ?? null;
+  const searching = search.isFetching;
+  const failed = search.isError;
 
   // '/' focuses the query box while this section is active and no modal is open
   useEffect(() => {
@@ -41,7 +51,7 @@ export function SearchSidebar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [ws.rail, fileModal]);
 
-  const run = async () => {
+  const run = () => {
     const query = q.trim();
     if (!query) return;
     const params = new URLSearchParams({ q: query });
@@ -50,17 +60,7 @@ export function SearchSidebar() {
     if (source !== 'any') params.set('source', source);
     params.set('kind', kind);
     params.set('limit', limit || '30');
-    setSearching(true);
-    setFailed(false);
-    try {
-      const d = await api<{ results: SearchResult[] }>('/api/search?' + params.toString());
-      setResults(d.results || []);
-    } catch {
-      setFailed(true);
-      setResults(null);
-    } finally {
-      setSearching(false);
-    }
+    setSubmitted(params.toString());
   };
 
   const openFile = (path: string, line: number) => {
@@ -84,7 +84,7 @@ export function SearchSidebar() {
           placeholder="Search corpus…  ( / )"
           autoComplete="off"
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void run(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) run(); }}
         />
         <div className="ss-grid">
           <select value={lang} onChange={(e) => setLang(e.target.value)} title="Language">
@@ -113,7 +113,7 @@ export function SearchSidebar() {
             title="Max results"
             onChange={(e) => setLimit(e.target.value)}
           />
-          <button className="btn btn-sm primary" onClick={() => void run()} disabled={searching}>
+          <button className="btn btn-sm primary" onClick={() => run()} disabled={searching}>
             {searching ? '…' : 'Search'}
           </button>
           <span className="toolbar-spacer" />

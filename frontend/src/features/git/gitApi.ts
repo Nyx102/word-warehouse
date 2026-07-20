@@ -11,27 +11,13 @@ import type {
 
 /* Typed wrappers over the git endpoints. Reads throw like api() does;
  * mutations never throw for HTTP failures, they resolve to a result the UI
- * can branch on (api() has already toasted). Every successful mutation is
- * broadcast so sidebars/buffers showing the same repo can refetch. */
+ * can branch on (api() has already toasted). Cache invalidation after a
+ * successful mutation is react-query's job now (useGitMutations invalidates
+ * ['git', repo]); these wrappers just talk to the backend. */
 
 export type GitMutateResult =
   | { ok: true; hash?: string }
   | { ok: false; conflict: boolean; message: string };
-
-type GitMutateListener = (repo: RepoName) => void;
-const mutateListeners = new Set<GitMutateListener>();
-
-/** Subscribe to git-state changes; returns the unsubscribe function */
-export function onGitMutate(fn: GitMutateListener): () => void {
-  mutateListeners.add(fn);
-  return () => { mutateListeners.delete(fn); };
-}
-
-/** Broadcast a git-state change (fired by mutations here; also callable for
- * out-of-band changes such as a file save that dirties the worktree) */
-export function notifyGitChanged(repo: RepoName): void {
-  for (const fn of [...mutateListeners]) fn(repo);
-}
 
 /* ---- reads ---- */
 
@@ -82,7 +68,6 @@ async function mutate(
       method: 'POST',
       body: { repo, ...body },
     });
-    notifyGitChanged(repo);
     return { ok: true, hash: r.hash };
   } catch (e) {
     if (e instanceof ApiError) {

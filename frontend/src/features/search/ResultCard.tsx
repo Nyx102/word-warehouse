@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { esc } from '@/lib/markdown';
 import type { ChunkResponse, SearchResult } from '@/lib/types';
@@ -25,9 +26,38 @@ export function ResultCard({ r, onOpen, onView }: {
   onView: (path: string, start: number) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [ctx, setCtx] = useState<CtxChunk[] | null>(null);
-  const [ctxFailed, setCtxFailed] = useState(false);
-  const [loading, setLoading] = useState(false);
+
+  // Context chunks load lazily on first expand and are cached forever (a chunk's
+  // neighbors don't move); enabled:open gates the fetch until the card opens.
+  const chunk = useQuery({
+    queryKey: ['chunk', r.chunk_id],
+    queryFn: () => api<ChunkResponse>(`/api/chunk/${r.chunk_id}?before=2&after=2`),
+    enabled: open,
+    staleTime: Infinity,
+  });
+  const loading = chunk.isFetching;
+  const ctxFailed = chunk.isError;
+  const ctx = useMemo<CtxChunk[] | null>(() => {
+    const d = chunk.data;
+    if (!d) return null;
+    const row = d.row || ({} as ChunkResponse['row']);
+    const items: CtxChunk[] = (d.neighbors || []).map((n) => ({
+      ord: n.ord ?? 0,
+      startLine: n.start_line,
+      endLine: n.end_line,
+      text: n.text || '',
+      hit: false,
+    }));
+    items.push({
+      ord: typeof row.ord === 'number' ? row.ord : 0,
+      startLine: row.start_line,
+      endLine: row.end_line,
+      text: row.text || '',
+      hit: true,
+    });
+    items.sort((a, b) => a.ord - b.ord);
+    return items;
+  }, [chunk.data]);
 
   const meta: string[] = [];
   if (r.series != null && r.series !== '') meta.push('S' + r.series);
@@ -37,37 +67,7 @@ export function ResultCard({ r, onOpen, onView }: {
   if (r.subtitle) meta.push('“' + r.subtitle + '”');
   if (r.part_title) meta.push(r.part_title);
 
-  const toggle = async () => {
-    if (open) { setOpen(false); return; }
-    setOpen(true);
-    if (ctx || loading) return;
-    setLoading(true);
-    try {
-      const d = await api<ChunkResponse>(`/api/chunk/${r.chunk_id}?before=2&after=2`);
-      const row = d.row || ({} as ChunkResponse['row']);
-      const items: CtxChunk[] = (d.neighbors || []).map((n) => ({
-        ord: n.ord ?? 0,
-        startLine: n.start_line,
-        endLine: n.end_line,
-        text: n.text || '',
-        hit: false,
-      }));
-      items.push({
-        ord: typeof row.ord === 'number' ? row.ord : 0,
-        startLine: row.start_line,
-        endLine: row.end_line,
-        text: row.text || '',
-        hit: true,
-      });
-      items.sort((a, b) => a.ord - b.ord);
-      setCtx(items);
-      setCtxFailed(false);
-    } catch {
-      setCtxFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const toggle = () => setOpen((v) => !v);
 
   return (
     <div className="result-card">
@@ -85,7 +85,7 @@ export function ResultCard({ r, onOpen, onView }: {
         <div className="card-snippet" dangerouslySetInnerHTML={{ __html: markSnippet(r.snippet || '') }} />
       </div>
       <div className="card-actions">
-        <button className="linkish" onClick={() => void toggle()}>
+        <button className="linkish" onClick={toggle}>
           {open ? 'hide context' : 'context'}
         </button>
         <button

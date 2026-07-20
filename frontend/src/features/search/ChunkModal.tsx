@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Modal } from '@/components/Modal';
-import { useAsync } from '@/hooks/useAsync';
 import type { FilePage } from '@/lib/types';
 
 const PAGE = 200;
@@ -15,10 +15,11 @@ export function ChunkModal({ path, initialStart, onClose, onEdit }: {
 }) {
   const [start, setStart] = useState(Math.max(1, initialStart || 1));
 
-  const page = useAsync(
-    () => api<FilePage>(`/api/file?path=${encodeURIComponent(path)}&start=${start}&count=${PAGE}`),
-    [path, start],
-  );
+  const page = useQuery({
+    queryKey: ['file', 'page', path, start],
+    queryFn: () => api<FilePage>(`/api/file?path=${encodeURIComponent(path)}&start=${start}&count=${PAGE}`),
+    placeholderData: keepPreviousData, // keep the current page visible while the next loads
+  });
 
   const d = page.data;
   const lines = d?.lines ?? [];
@@ -36,7 +37,7 @@ export function ChunkModal({ path, initialStart, onClose, onEdit }: {
         <>
           <button
             className="btn"
-            disabled={effStart <= 1 || page.loading}
+            disabled={effStart <= 1 || page.isFetching}
             onClick={() => setStart(Math.max(1, effStart - PAGE))}
           >← Prev</button>
           <span className="dim">
@@ -47,7 +48,7 @@ export function ChunkModal({ path, initialStart, onClose, onEdit }: {
           )}
           <button
             className="btn"
-            disabled={!d || end >= total || page.loading}
+            disabled={!d || end >= total || page.isFetching}
             onClick={() => setStart(effStart + PAGE)}
           >Next →</button>
         </>
