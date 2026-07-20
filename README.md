@@ -13,7 +13,13 @@ CLAUDE.md's iron rule — no hardcoded paths).
 
 ```sh
 docker compose up -d --build        # serves :8686 on all interfaces
+WORLDEND_DEV=1 docker compose up     # dev mode: live-reload, browse :5173
 ```
+
+Dev mode (set `WORLDEND_DEV=1` here or in `.env`) hot-reloads the backend on
+:8686 and runs a Vite HMR server on :5173 that live-reloads the UI on frontend
+edits — browse `:5173` while developing. Unset/empty is prod, which serves the
+prebuilt bundle on :8686.
 
 or directly on the host (same behavior, no container). Host runs now need the
 web deps (`pip install fastapi "uvicorn[standard]"`, plus `pyyaml`):
@@ -103,7 +109,7 @@ phone.
 | `backend/lint/checker.py` | lint: near-miss typos (edit-distance vs replacements.yaml vocab, official-EN whitelist) + leftover-term regression with exact rule simulation |
 | `backend/adapters/chat.py` | claude CLI headless (stream-json, `--resume` per thread); permissions via flags (allow: read/search/edit + corpus CLI + read-only git; deny: commit/push/rm/sudo); **default model sonnet**, per-thread picker in the UI; credits are spent only here and in triage |
 | `backend/lint/triage.py` | AI flag adjudication: haiku judges lint flags from context (±2→±10→±30 line escalation, max 2), conservative, per-file verdict cache — unchanged text is never re-judged |
-| `frontend/` | React + Vite + TS + CodeMirror IDE workspace (icon rail + sidebar + buffer tabs + chat dock; doom-one dark/light; vim/emacs/normal keymaps; mobile bottom nav, installable PWA). Rebuild after changes: `docker compose exec word-warehouse sh -c 'cd frontend && npm run build'`; HMR dev server: `npm run dev` in-container on :5173 |
+| `frontend/` | React + Vite + TS + CodeMirror IDE workspace (icon rail + sidebar + buffer tabs + chat dock; doom-one dark/light; vim/emacs/normal keymaps; mobile bottom nav, installable PWA). Rebuild after changes: `scripts/rebuild-frontend.sh`; HMR dev server: `npm run dev` in-container on :5173 |
 | `backend/cli.py` | the `corpus` command (symlinked into `~/.local/bin` and the container): search / context / align / terms / lint / sniff / status / reindex |
 | `scripts/reorg.py` | one-shot corpus reorganization (already executed 2026-07-17) |
 | `scripts/coverage.py` | regenerates `corpus/notes/coverage.md` |

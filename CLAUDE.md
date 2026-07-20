@@ -25,7 +25,8 @@ path); the host location is irrelevant and may change.
 ## Run / dev
 
 - `docker compose up -d --build` — the whole thing (binds :8686; container name `word-warehouse`).
-- Frontend rebuild: `docker compose exec word-warehouse sh -c 'cd frontend && npm run build'`; HMR: `npm run dev` in-container on :5173.
+- Dev mode: `WORLDEND_DEV=1` (in `.env` or inline: `WORLDEND_DEV=1 docker compose up`) makes the container live-reload — backend hot-reload on :8686 and Vite HMR on :5173 (browse :5173). Empty/unset = prod, serving the built bundle. The entrypoint that branches on it is `scripts/container-start.sh`.
+- Frontend rebuild (prod bundle): `scripts/rebuild-frontend.sh` (wraps `docker compose exec word-warehouse sh -c 'cd frontend && npm run build'`).
 - `corpus` CLI = `backend/cli.py` (wrapper at /usr/local/bin/corpus runs `python3 -m backend.cli`).
 - Tests are live-data verifications — see the verification sections in README.md; the index rebuilds itself, never hand-edit `data/corpus.db`.
 

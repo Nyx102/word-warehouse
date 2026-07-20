@@ -31,7 +31,7 @@ from backend.adapters import chat
 from backend.lint import checker
 from backend.adapters import gitops
 from backend.index import search as searchmod
-from backend.config import CORPUS, DATA, FS_ROOT, HOST, PORT, ROOT
+from backend.config import CORPUS, DATA, DEV, FS_ROOT, HOST, PORT, ROOT
 from backend.db import connect
 from backend.index.indexer import ensure_fresh
 from backend.adapters.pathsafe import safe_corpus_path, safe_fs_path, safe_repo_path
@@ -623,6 +623,16 @@ def main():
     ap.add_argument("--host", default=HOST)
     ap.add_argument("--port", type=int, default=PORT)
     args = ap.parse_args()
+
+    # Dev mode turns on backend hot-reload: uvicorn's reloader respawns the
+    # worker on any backend/ edit. reload= needs an import string (not the app
+    # object) so the reloader can re-import; the watch is scoped to backend/
+    # because the frontend has its own HMR server (see scripts/container-start.sh).
+    if DEV:
+        print(f"Word Warehouse (dev: backend hot-reload) on http://{args.host}:{args.port}")
+        uvicorn.run("backend.server:app", host=args.host, port=args.port,
+                    reload=True, reload_dirs=[str(ROOT / "backend")])
+        return
 
     print(f"Word Warehouse listening on http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port)

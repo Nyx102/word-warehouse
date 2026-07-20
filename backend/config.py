@@ -24,6 +24,16 @@ SCRIPTS_DIR = REPO / "Scripts"
 HOST = os.environ.get("WORLDEND_HOST", "127.0.0.1")
 PORT = int(os.environ.get("WORLDEND_PORT", "8686"))
 
+
+def env_flag(name: str) -> bool:
+    """Env truthiness: 1/true/yes/on (any case) enable; unset, empty, 0, false,
+    no, off disable — so a leftover WORLDEND_DEV=0 can't quietly turn dev on."""
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+# Live-reload dev mode: backend hot-reload + Vite HMR. See scripts/container-start.sh.
+DEV = env_flag("WORLDEND_DEV")
+
 # Glob patterns (relative to CORPUS) that make up the index, and nothing else
 INCLUDE_GLOBS = [
     "worldend/official-en/*.txt",

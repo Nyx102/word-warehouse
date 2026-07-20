@@ -39,4 +39,6 @@ RUN printf '#!/bin/sh\nexec env PYTHONPATH=/word-warehouse python3 -m backend.cl
 USER dev
 WORKDIR /word-warehouse
 EXPOSE 8686
-CMD ["python3", "-m", "backend.server", "--host", "0.0.0.0", "--port", "8686"]
+# Entrypoint branches on WORLDEND_DEV: prod serves the built bundle; dev also
+# brings up the Vite HMR server and hot-reloads the backend.
+CMD ["bash", "scripts/container-start.sh"]

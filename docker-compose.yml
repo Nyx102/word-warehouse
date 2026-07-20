@@ -21,3 +21,6 @@ services:
     mem_limit: 3g
     environment:
       - WORLDEND_CLAUDE_BIN=claude
+      # Set WORLDEND_DEV=1 (here or in .env) for live-reload dev mode: backend
+      # hot-reload on :8686 and Vite HMR on :5173. Empty = prod (served bundle).
+      - WORLDEND_DEV=${WORLDEND_DEV:-}
