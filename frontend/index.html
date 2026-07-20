@@ -11,7 +11,7 @@
       (function () {
         var theme = 'dark';
         try {
-          var s = JSON.parse(localStorage.getItem('ww.settings.v1') || '{}');
+          var s = JSON.parse(localStorage.getItem('worldend.settings.v1') || '{}');
           if (s && s.theme === 'light') theme = 'light';
         } catch (e) { /* Corrupted settings -> dark */ }
         document.documentElement.dataset.theme = theme;
