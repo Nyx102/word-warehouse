@@ -15,7 +15,8 @@ CLAUDE.md's iron rule — no hardcoded paths).
 docker compose up -d --build        # serves :8686 on all interfaces
 ```
 
-or directly on the host (same behavior, no container):
+or directly on the host (same behavior, no container). Host runs now need the
+web deps (`pip install fastapi "uvicorn[standard]"`, plus `pyyaml`):
 
 ```sh
 python3 -m backend.server                   # binds 127.0.0.1:8686
@@ -94,7 +95,7 @@ phone.
 
 | Path | What |
 |---|---|
-| `backend/server.py` | pure-stdlib HTTP + SSE server; background poller keeps index fresh every 5 s (no AI credits — local stat scan) |
+| `backend/server.py` | FastAPI + uvicorn HTTP + SSE server; background poller keeps index fresh every 5 s (no AI credits — local stat scan) |
 | `backend/adapters/pathsafe.py` | path-traversal guards (`safe_corpus_path` / `safe_repo_path` / `safe_fs_path`), one per served root |
 | `backend/adapters/gitops.py` | git backend for the workspace git UI: porcelain-v2 status, worktree/staged diffs, file+hunk stage/unstage via `git apply --cached`, commit staged set, log/show/branches; per-repo mutex, injection guards |
 | `backend/index/indexer.py` | segmentation per source format; JP ruby-strip + trad→simp shadow columns; SQLite FTS5 (unicode61 for EN, trigram for CJK) |

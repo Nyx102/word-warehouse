@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g @anthropic-ai/claude-code \
-    && pip install --no-cache-dir pyyaml \
+    && pip install --no-cache-dir pyyaml fastapi "uvicorn[standard]" \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Run as a non-root user whose uid/gid match the host caller. docker-compose

@@ -16,7 +16,7 @@ path); the host location is irrelevant and may change.
 
 | Path | What |
 |---|---|
-| `backend/` | pure-stdlib Python backend package: core `config.py`/`db.py` plus entry points `server.py`/`cli.py` at the package root, with `index/`, `lint/`, `adapters/` subpackages; see README.md for the module table |
+| `backend/` | FastAPI + uvicorn backend package: core `config.py`/`db.py` plus entry points `server.py`/`cli.py` at the package root, with `index/`, `lint/`, `adapters/` subpackages; see README.md for the module table |
 | `corpus/` | ALL translation data (raws, official EN, the translation git submodule at `corpus/worldend2/repo`, assistant notes)—corpus data is part of this repo; the submodule is tracked as a gitlink |
 | `frontend/` | React + Vite + TS + CodeMirror IDE workspace (rail sections Files/Search/Git/Flags/Chat, buffer tabs, chat dock); styles split under `frontend/src/styles/`—color literals live ONLY in `tokens.css`; build lands in `frontend/dist`, served by `backend/server.py` |
 | `data/` | runtime state (sqlite index, converted artifacts) — gitignored, disposable except chat threads |
