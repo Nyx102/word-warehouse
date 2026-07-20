@@ -26,6 +26,27 @@ if [ -n "$dev" ]; then
   fi
 fi
 
+# Pre-trust the workspace for the embedded assistant. Claude Code ignores a
+# project's .claude/settings.json in an untrusted folder and warns on stderr
+# ("this workspace has not been trusted"); the assistant spawns `claude`
+# headless (backend/adapters/chat.py) so there is no TTY to accept the trust
+# dialog. Trust lives per repo-root in ~/.claude.json, which is NOT a mounted
+# volume (unlike ~/.claude), so it is absent on a fresh container. Seed it for
+# the repo root (the git root claude walks up to from corpus). Idempotent;
+# merges into any existing file.
+python3 - <<'PY'
+import json, os
+path = os.path.expanduser("~/.claude.json")
+try:
+    with open(path) as f:
+        conf = json.load(f)
+except (FileNotFoundError, ValueError):
+    conf = {}
+conf.setdefault("projects", {}).setdefault("/word-warehouse", {})["hasTrustDialogAccepted"] = True
+with open(path, "w") as f:
+    json.dump(conf, f)
+PY
+
 # Backend is the container's main process; WORLDEND_DEV makes backend.server
 # start uvicorn with --reload. Any backgrounded Vite is torn down with the
 # container (its exposed :5173 dies when this process exits).
