@@ -3,16 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useSettings } from '@/context/settings';
 import { useWorkspace } from '@/context/workspace';
 import { toast } from '@/components/Toasts';
-import { DiffText } from '@/features/git/DiffText';
-import {
-  buildHunkPatch,
-  hunkBody,
-  parseDiff,
-  type DiffFile,
-  type DiffHunk,
-} from '@/features/git/diffParse';
-import { fileLabel, fmtWhen, repoLabel, statusChar, statusClass, type GitSection } from '@/features/git/fmt';
-import { IconChevronRight } from '@/components/layout/icons';
+import { buildHunkPatch, parseDiff, type DiffFile } from '@/features/git/diffParse';
+import { repoLabel, type GitSection } from '@/features/git/fmt';
 import {
   gitDiffText,
   gitLog,
@@ -22,36 +14,11 @@ import {
 } from '@/features/git/gitApi';
 import { gitKeys } from '@/features/git/gitKeys';
 import { useGitMutations } from '@/features/git/useGitMutations';
-import type { GitLogEntry, GitStatusFile, GitStatusResponse, RepoName } from '@/lib/types';
-
-interface Data {
-  status: GitStatusResponse;
-  log: GitLogEntry[];
-  worktree: Map<string, DiffFile>;
-  staged: Map<string, DiffFile>;
-}
-
-interface FileRow {
-  type: 'file';
-  key: string;
-  section: GitSection;
-  entry: GitStatusFile;
-  diff: DiffFile | null;
-}
-interface HunkRow {
-  type: 'hunk';
-  key: string;
-  section: 'unstaged' | 'staged';
-  path: string;
-  file: DiffFile;
-  hunk: DiffHunk;
-}
-interface CommitRow {
-  type: 'commit';
-  key: string;
-  entry: GitLogEntry;
-}
-type Row = FileRow | HunkRow | CommitRow;
+import type { GitStatusFile, RepoName } from '@/lib/types';
+import { CommitRow } from './CommitRow';
+import { Section } from './Section';
+import { useRovingPoint } from './useRovingPoint';
+import type { Data, Row, RowRenderCtx } from './types';
 
 const byPath = (files: DiffFile[]) => new Map(files.map((f) => [f.path, f]));
 
@@ -62,13 +29,9 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   const ws = useWorkspace();
   const { keymap } = useSettings();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [pointKey, setPointKey] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
-  const lastIdxRef = useRef(0);
-  const containerRef = useRef<HTMLDivElement>(null);
   const commitRef = useRef<HTMLTextAreaElement>(null);
-  const rowEls = useRef(new Map<string, HTMLDivElement>());
 
   // One composite key holds the atomic 4-way snapshot; react-query's own
   // request bookkeeping replaces the old seqRef out-of-order guard. Any git
@@ -95,15 +58,6 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   const loading = q.isFetching;
   const error = q.error ? q.error.message : null;
   const refetch = q.refetch;
-
-  // Re-poll whenever the buffer becomes the active tab
-  const active = ws.activeId === 'magit:' + repo;
-  useEffect(() => { if (active) void refetch(); }, [active, refetch]);
-  // Buffers stay mounted (CSS-hidden) across tab switches, so keyboard nav
-  // (n/p/j/k, TAB to expand) only works if we grab focus on activation —
-  // otherwise the first keypress after switching tabs falls through to
-  // whatever the browser's default tab order last focused
-  useEffect(() => { if (active) containerRef.current?.focus(); }, [active]);
 
   const files = data?.status.files ?? [];
   const untrackedFiles = files.filter((f) => f.untracked);
@@ -138,32 +92,16 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, expanded]);
 
-  // pointKey stays null (nothing highlighted) until the user actually clicks
-  // a row or presses a nav key — a fallback-to-row-0 default read as "one
-  // row is randomly stuck selected" before any interaction happened
-  const foundIdx = pointKey === null ? -1 : rows.findIndex((r) => r.key === pointKey);
-  const pointIndex = pointKey === null || rows.length === 0 ? -1
-    : foundIdx === -1 ? Math.min(lastIdxRef.current, rows.length - 1) : foundIdx;
-  if (pointIndex >= 0) lastIdxRef.current = pointIndex;
-  const pointRow = pointIndex >= 0 ? rows[pointIndex] : null;
+  const { pointRow, setPointKey, move, setRowEl, focusSelf, containerRef } = useRovingPoint(rows);
 
-  useEffect(() => {
-    if (pointKey) rowEls.current.get(pointKey)?.scrollIntoView({ block: 'nearest' });
-  }, [pointKey]);
-
-  const setRowEl = (key: string) => (el: HTMLDivElement | null) => {
-    if (el) rowEls.current.set(key, el);
-    else rowEls.current.delete(key);
-  };
-  const focusSelf = () => containerRef.current?.focus();
-
-  const move = (delta: number) => {
-    if (!rows.length) return;
-    const next = pointIndex < 0
-      ? (delta > 0 ? 0 : rows.length - 1)
-      : Math.max(0, Math.min(rows.length - 1, pointIndex + delta));
-    setPointKey(rows[next].key);
-  };
+  // Re-poll whenever the buffer becomes the active tab
+  const active = ws.activeId === 'magit:' + repo;
+  useEffect(() => { if (active) void refetch(); }, [active, refetch]);
+  // Buffers stay mounted (CSS-hidden) across tab switches, so keyboard nav
+  // (n/p/j/k, TAB to expand) only works if we grab focus on activation;
+  // otherwise the first keypress after switching tabs falls through to
+  // whatever the browser's default tab order last focused.
+  useEffect(() => { if (active) containerRef.current?.focus(); }, [active, containerRef]);
 
   const toggleExpand = (key: string, only?: 'open') => {
     setExpanded((s) => {
@@ -207,12 +145,12 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
     if (row.type === 'commit') {
       ws.open({ kind: 'commit', repo, rev: row.entry.oid });
     } else if (row.type === 'hunk') {
-      // A hunk means "show me that change" — the merge editor, scrolled to
-      // and briefly flashing that exact line
+      // A hunk means "show me that change": the merge editor, scrolled to and
+      // briefly flashing that exact line.
       ws.open({ kind: 'diff', repo, path: row.path, line: row.hunk.newStart });
     } else {
-      // The filename itself just means "open the file" — plain editor, top
-      // of file, no target line
+      // The filename itself just means "open the file": plain editor, top of
+      // file, no target line.
       ws.open({ kind: 'file', path: repoFsPath(repo, row.entry.path) });
     }
   };
@@ -239,8 +177,8 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return;
-    // Tab never gets to do browser default focus-cycling in here, even from
-    // a focused button — it's either "expand this row" or nothing
+    // Tab never gets to do browser default focus-cycling in here, even from a
+    // focused button; it's either "expand this row" or nothing.
     if (e.key === 'Tab') {
       e.preventDefault();
       if (pointRow?.type === 'file' && pointRow.diff?.hunks.length && pointRow.section !== 'untracked') {
@@ -270,111 +208,18 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
     }
   };
 
-  const fileRow = (section: GitSection, f: GitStatusFile) => {
-    const key = section + ':' + f.path;
-    const diff = section === 'unstaged' ? data?.worktree.get(f.path)
-      : section === 'staged' ? data?.staged.get(f.path)
-        : null;
-    const row: FileRow = { type: 'file', key, section, entry: f, diff: diff ?? null };
-    const canExpand = section !== 'untracked' && !!diff && diff.hunks.length > 0;
-    const isOpen = canExpand && expanded.has(key);
-    const ch = statusChar(section, f);
-    return (
-      <div key={key}>
-        <div
-          className={'magit-row magit-file-row' + (pointRow?.key === key ? ' point' : '')}
-          ref={setRowEl(key)}
-          onClick={() => {
-            focusSelf();
-            setPointKey(key);
-            if (canExpand) toggleExpand(key);
-          }}
-        >
-          <span className={'magit-expander' + (isOpen ? ' open' : '')}>
-            {canExpand && <IconChevronRight />}
-          </span>
-          <span className={'git-st ' + statusClass(ch)}>{ch}</span>
-          <span className="magit-path mono" title={f.path}>{fileLabel(f)}</span>
-          <span className="row-actions">
-            {section !== 'staged' && (
-              <button
-                className="btn btn-sm"
-                disabled={!!busy}
-                onClick={(e) => { e.stopPropagation(); stageAt(row); }}
-              >Stage</button>
-            )}
-            {section === 'staged' && (
-              <button
-                className="btn btn-sm"
-                disabled={!!busy}
-                onClick={(e) => { e.stopPropagation(); unstageAt(row); }}
-              >Unstage</button>
-            )}
-            <button
-              className="btn btn-sm"
-              onClick={(e) => { e.stopPropagation(); visit(row); }}
-            >Open</button>
-          </span>
-        </div>
-        {isOpen && diff && diff.hunks.map((h, n) => hunkBlock(section as 'unstaged' | 'staged', f.path, diff, h, n))}
-      </div>
-    );
+  const ctx: RowRenderCtx = {
+    expanded,
+    pointKey: pointRow?.key ?? null,
+    busy,
+    setRowEl,
+    focusSelf,
+    setPoint: setPointKey,
+    toggleExpand,
+    onStage: stageAt,
+    onUnstage: unstageAt,
+    onVisit: visit,
   };
-
-  const hunkBlock = (
-    section: 'unstaged' | 'staged',
-    path: string,
-    file: DiffFile,
-    hunk: DiffHunk,
-    n: number,
-  ) => {
-    const key = section + ':' + path + '#' + n;
-    const row: HunkRow = { type: 'hunk', key, section, path, file, hunk };
-    return (
-      <div
-        key={key}
-        className={'magit-hunk' + (pointRow?.key === key ? ' point' : '')}
-        ref={setRowEl(key)}
-        onClick={() => { focusSelf(); setPointKey(key); }}
-      >
-        <div className="magit-hunk-head">
-          <span className="magit-hunk-label mono">{hunk.header}</span>
-          <span className="row-actions">
-            <button
-              className="btn btn-sm"
-              disabled={!!busy}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (section === 'unstaged') stageAt(row); else unstageAt(row);
-              }}
-            >{section === 'unstaged' ? 'Stage' : 'Unstage'}</button>
-            <button
-              className="btn btn-sm"
-              onClick={(e) => { e.stopPropagation(); visit(row); }}
-            >Open</button>
-          </span>
-        </div>
-        <DiffText text={hunkBody(hunk)} />
-      </div>
-    );
-  };
-
-  const section = (
-    title: string,
-    id: GitSection,
-    list: GitStatusFile[],
-    note?: string,
-  ) => (
-    <div className="magit-section">
-      <div className="magit-section-h">
-        {title} <span className="magit-count">{list.length}</span>
-        {note && list.length > 0 && <span className="magit-note dim">{note}</span>}
-      </div>
-      {list.length === 0
-        ? <div className="magit-empty dim">nothing</div>
-        : list.map((f) => fileRow(id, f))}
-    </div>
-  );
 
   const b = data?.status.branch;
   return (
@@ -403,33 +248,14 @@ export function MagitBuffer({ repo }: { repo: RepoName }) {
       {!data && !error && <div className="empty">Loading…</div>}
       {data && (
         <div className="magit-body">
-          {section('Untracked', 'untracked', untrackedFiles, 'whole-file staging only')}
-          {section('Unstaged', 'unstaged', unstagedFiles)}
-          {section('Staged', 'staged', stagedFiles)}
+          <Section title="Untracked" id="untracked" list={untrackedFiles} note="whole-file staging only" data={data} ctx={ctx} />
+          <Section title="Unstaged" id="unstaged" list={unstagedFiles} data={data} ctx={ctx} />
+          <Section title="Staged" id="staged" list={stagedFiles} data={data} ctx={ctx} />
           <div className="magit-section">
             <div className="magit-section-h">Recent commits</div>
             {data.log.length === 0
               ? <div className="magit-empty dim">no commits yet</div>
-              : data.log.map((e) => {
-                const key = 'commit:' + e.oid;
-                return (
-                  <div
-                    key={key}
-                    className={'magit-row magit-commit-row' + (pointRow?.key === key ? ' point' : '')}
-                    ref={setRowEl(key)}
-                    onClick={() => {
-                      // Pure navigation, unlike a file row's click-to-expand —
-                      // don't pin it as "selected" forever after you leave
-                      focusSelf();
-                      ws.open({ kind: 'commit', repo, rev: e.oid });
-                    }}
-                  >
-                    <span className="log-hash mono">{e.hash}</span>
-                    <span className="log-subject" title={e.subject}>{e.subject}</span>
-                    <span className="log-date dim">{fmtWhen(e.date)}</span>
-                  </div>
-                );
-              })}
+              : data.log.map((e) => <CommitRow key={'commit:' + e.oid} entry={e} ctx={ctx} />)}
             <button
               className="btn btn-sm magit-more"
               onClick={() => ws.open({ kind: 'log', repo })}
