@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { esc } from '@/lib/markdown';
+import { IconClose, IconRevert } from '@/components/layout/icons';
 import type { LintFlag } from '@/lib/types';
 
 /** Stable identity for dismiss/undismiss/triage calls. */
@@ -67,9 +68,12 @@ export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen }: {
     <div className={'flag' + (dismissed ? ' dismissed' : '')}>
       <div className="flag-head">
         <span className={chipClass}>{flag.manual ? 'manual ' + flag.category : flag.category}</span>
-        <button className="btn btn-sm flag-btn" onClick={onToggleDismiss}>
-          {dismissed ? 'Undismiss' : 'Dismiss'}
-        </button>
+        <button
+          className="tb-btn flag-btn"
+          onClick={onToggleDismiss}
+          title={dismissed ? 'Undismiss' : 'Dismiss'}
+          aria-label={dismissed ? 'Undismiss' : 'Dismiss'}
+        >{dismissed ? <IconRevert /> : <IconClose />}</button>
       </div>
       {title}
       {flag.ai?.verdict === 'keep' && (

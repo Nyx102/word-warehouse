@@ -1,4 +1,5 @@
 import { flagIdent } from './FlagCard';
+import { IconRevert } from '@/components/layout/icons';
 import type { LintFlag } from '@/lib/types';
 
 export interface ClearedFlag {
@@ -23,11 +24,12 @@ export function AiDismissedSection({ cleared, onRestore, busyKeys }: {
             <div className="flag-head">
               <span className="chip chip-clear">{flag.category}</span>
               <button
-                className="btn btn-sm"
+                className="tb-btn flag-btn"
                 disabled={busyKeys.has(flagIdent(flag))}
                 title="Disagree with the AI verdict and restore this flag"
+                aria-label="Restore this flag"
                 onClick={() => onRestore(flag)}
-              >Restore</button>
+              ><IconRevert /></button>
             </div>
             <span className="flag-title">
               <b>{flag.key}</b> <span className="dim mono">{filePath}</span>

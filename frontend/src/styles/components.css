@@ -186,7 +186,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-radius: 4px;
-  padding: 2px 7px;
+  padding: 7px;
   flex: none;
 }
 .chip-nearmiss { background: var(--tint-yellow-bg); color: var(--warn); border: 1px solid var(--tint-yellow-border); }
