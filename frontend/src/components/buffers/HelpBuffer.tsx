@@ -3,6 +3,7 @@ import { api } from '@/lib/api';
 import { useWorkspace } from '@/context/workspace';
 import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 import { Markdown } from '@/lib/markdown';
+import { IconRefresh } from '@/components/layout/icons';
 
 /** Help buffer: the server's help markdown on sans prose. */
 export function HelpBuffer() {
@@ -17,9 +18,12 @@ export function HelpBuffer() {
       <div className="doc-tools">
         <span className="dim">Word Warehouse help</span>
         <span className="toolbar-spacer" />
-        <button className="btn btn-sm" onClick={() => void help.refetch()} disabled={help.isFetching}>
-          {help.isFetching ? 'Loading…' : 'Reload'}
-        </button>
+        <button
+          className={'icon-btn doc-refresh' + (help.isFetching ? ' loading' : '')}
+          onClick={() => void help.refetch()}
+          disabled={help.isFetching}
+          title="Reload" aria-label="Reload"
+        ><IconRefresh /></button>
       </div>
       {help.isFetching && !help.data && <div className="empty">Loading…</div>}
       {help.error && !help.isFetching && <div className="empty">Failed to load help.</div>}

@@ -92,7 +92,10 @@
   padding: 6px 10px;
   font-size: 12.5px;
 }
-.chip-gear { color: var(--accent); }
+/* SVG cog (not an emoji glyph, which never centers reliably on the text
+ * baseline); align-self centers it against the baseline-aligned label */
+.chip-gear { color: var(--accent); align-self: center; display: inline-flex; }
+.chip-gear svg { width: 13px; height: 13px; display: block; }
 .tool-chip.chip-error .chip-gear { color: var(--err); }
 .chip-input {
   color: var(--fg-dim);

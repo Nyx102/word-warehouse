@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { useWorkspace } from '@/context/workspace';
 import { ChunkModal } from '@/features/search/ChunkModal';
 import { ResultCard } from '@/features/search/ResultCard';
+import { IconMatrix } from '@/components/layout/icons';
 import type { SearchResult } from '@/lib/types';
 
 const LANGS = ['any', 'en', 'jp', 'zh', 'zh-s', 'zh-t'];
@@ -92,8 +93,8 @@ export function SearchSidebar() {
           </select>
           <select value={series} onChange={(e) => setSeries(e.target.value)} title="Series">
             <option value="any">series: any</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
+            <option value="1">WorldEnd</option>
+            <option value="2">WorldEnd2</option>
           </select>
           <select value={source} onChange={(e) => setSource(e.target.value)} title="Source">
             {SOURCES.map((s) => <option key={s} value={s}>{s === 'any' ? 'source: any' : s}</option>)}
@@ -117,8 +118,8 @@ export function SearchSidebar() {
             {searching ? '…' : 'Search'}
           </button>
           <span className="toolbar-spacer" />
-          <button className="btn btn-sm" onClick={openAlign} title="Chapter alignment matrix">
-            Align matrix
+          <button className="btn btn-sm ss-align" onClick={openAlign} title="Chapter alignment matrix">
+            <IconMatrix /><span>Align matrix</span>
           </button>
         </div>
       </div>

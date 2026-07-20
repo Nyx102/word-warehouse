@@ -3,6 +3,7 @@ import { api } from '@/lib/api';
 import { useWorkspace } from '@/context/workspace';
 import { useKeyboardScroll } from '@/hooks/useKeyboardScroll';
 import { Markdown } from '@/lib/markdown';
+import { IconRefresh } from '@/components/layout/icons';
 
 /** Coverage report buffer: server-generated markdown on sans prose. */
 export function CoverageBuffer() {
@@ -17,9 +18,12 @@ export function CoverageBuffer() {
       <div className="doc-tools">
         <span className="dim">Translation coverage</span>
         <span className="toolbar-spacer" />
-        <button className="btn btn-sm" onClick={() => void cov.refetch()} disabled={cov.isFetching}>
-          {cov.isFetching ? 'Loading…' : 'Reload'}
-        </button>
+        <button
+          className={'icon-btn doc-refresh' + (cov.isFetching ? ' loading' : '')}
+          onClick={() => void cov.refetch()}
+          disabled={cov.isFetching}
+          title="Reload" aria-label="Reload"
+        ><IconRefresh /></button>
       </div>
       {cov.isFetching && !cov.data && <div className="empty">Loading…</div>}
       {cov.error && !cov.isFetching && <div className="empty">Failed to load coverage.</div>}

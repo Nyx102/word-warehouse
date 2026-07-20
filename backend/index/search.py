@@ -113,18 +113,22 @@ def context(chunk_id, before=2, after=2):
     return dict(row=dict(row), neighbors=[dict(n) for n in neighbors])
 
 
-def align(series, volume=None):
-    """Chapter rows for all files of a series[/volume], for the alignment matrix."""
+def align(series=None, volume=None):
+    """Chapter rows for a series[/volume] (both optional), for the alignment matrix."""
     conn = connect()
     ensure_fresh(conn)
     sql = """
-SELECT f.path, f.source, f.lang, f.volume, ch.ord, ch.chapter_label,
+SELECT f.path, f.source, f.lang, f.series, f.volume, ch.ord, ch.chapter_label,
        ch.title, ch.subtitle, ch.subtitle_key, ch.part_title, ch.start_line, ch.end_line
-FROM chapters ch JOIN files f ON f.id = ch.file_id
-WHERE f.series = ?"""
-    params = [int(series)]
+FROM chapters ch JOIN files f ON f.id = ch.file_id"""
+    conds, params = [], []
+    if series:
+        conds.append("f.series = ?")
+        params.append(int(series))
     if volume:
-        sql += " AND f.volume = ?"
+        conds.append("f.volume = ?")
         params.append(str(volume).zfill(2) if str(volume).isdigit() else volume)
-    sql += " ORDER BY f.volume, f.source, f.path, ch.ord"
+    if conds:
+        sql += " WHERE " + " AND ".join(conds)
+    sql += " ORDER BY f.series, f.volume, f.source, f.path, ch.ord"
     return [dict(r) for r in conn.execute(sql, params).fetchall()]

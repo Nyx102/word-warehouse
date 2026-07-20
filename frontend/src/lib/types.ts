@@ -69,6 +69,7 @@ export interface AlignRow {
   path: string;
   source: string;
   lang: string;
+  series: number | string | null;
   volume: number | string | null;
   ord: number;
   chapter_label: string | null;

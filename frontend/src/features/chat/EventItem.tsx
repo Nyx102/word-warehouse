@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Markdown } from '@/lib/markdown';
 import { truncate } from '@/lib/util';
+import { IconGear } from '@/components/layout/icons';
 import type { ChatItem } from '@/hooks/useChatStream';
 
 export function EventItem({ item }: { item: ChatItem }) {
@@ -29,7 +30,7 @@ function ToolChip({ item }: { item: Extract<ChatItem, { type: 'tool' }> }) {
   return (
     <div className={'tool-chip' + (item.isError ? ' chip-error' : '')}>
       <button className="chip-head" onClick={() => setOpen((o) => !o)} title="Toggle tool result">
-        <span className="chip-gear">⚙</span>
+        <span className="chip-gear"><IconGear /></span>
         <b>{item.name}</b>
         <span className="chip-input">{truncate(item.inputPreview, 90)}</span>
       </button>

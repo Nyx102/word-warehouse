@@ -180,10 +180,8 @@ def chunk(chunk_id: int, request: Request):
 
 @app.get("/api/align")
 def align(request: Request):
-    series = _q(request, "series")
-    if not series:
-        raise HTTPException(400, "missing series")
-    return dict(rows=searchmod.align(series, _q(request, "volume") or None))
+    return dict(rows=searchmod.align(
+        _q(request, "series") or None, _q(request, "volume") or None))
 
 
 @app.get("/api/file")
