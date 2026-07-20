@@ -218,7 +218,7 @@
   flex: none;
   border-top: 1px solid var(--border);
   background: var(--bg-alt);
-  padding: 10px 14px calc(10px + var(--sab));
+  padding: 12px 12px calc(12px + var(--sab));
 }
 /* Skin/sizing come from the shared .field-box rules; commit body just runs a
  * slightly smaller mono face. The staged hint sits in the control bar and

@@ -27,7 +27,6 @@
 }
 /* Mobile change-stepper: hop between diff hunks without scrolling to hunt */
 .chunk-nav { display: inline-flex; gap: 4px; flex: none; }
-.chunk-nav .btn { min-width: 40px; min-height: 34px; font-weight: 700; line-height: 1; }
 .conflict-bar {
   display: flex;
   align-items: center;

@@ -216,3 +216,28 @@ export const IconClose = () => (
     <path d="M6 6l12 12M18 6L6 18" />
   </Svg>
 );
+
+export const IconChevronUp = () => (
+  <Svg>
+    <path d="M5 15l7-7 7 7" />
+  </Svg>
+);
+
+export const IconRevert = () => (
+  <Svg>
+    <path d="M9 14L4 9l5-5" />
+    <path d="M4 9h11a5 5 0 0 1 0 10h-4" />
+  </Svg>
+);
+
+export const IconPlus = () => (
+  <Svg>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+
+export const IconMinus = () => (
+  <Svg>
+    <path d="M5 12h14" />
+  </Svg>
+);

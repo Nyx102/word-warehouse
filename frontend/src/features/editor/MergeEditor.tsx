@@ -14,6 +14,7 @@ import { useMediaQuery } from '@/lib/util';
 import { useSettings } from '@/context/settings';
 import { applyKeymap, baseExtensions, flashLine, languageForPath, wireVimModeIndicator } from './cm';
 import { setVimMode } from './vimModeStore';
+import { IconChevronUp, IconChevronDown, IconClose, IconRefresh, IconRevert, IconSave } from '@/components/layout/icons';
 import { ReadOnlyEditor } from './ReadOnlyEditor';
 import type { FileFull, GitFileResponse, RepoName } from '@/lib/types';
 
@@ -311,32 +312,34 @@ export function MergeEditor({ repo, path, status, gotoLine, active, onChanged, o
         {!isDesktop && editable && (
           <span className="chunk-nav" role="group" aria-label="Jump between changes">
             <button
-              className="btn btn-sm"
+              className="tb-btn"
               onClick={() => viewRef.current?.goPrev()}
               title="Previous change"
               aria-label="Previous change"
-            >↑</button>
+            ><IconChevronUp /></button>
             <button
-              className="btn btn-sm"
+              className="tb-btn"
               onClick={() => viewRef.current?.goNext()}
               title="Next change"
               aria-label="Next change"
-            >↓</button>
+            ><IconChevronDown /></button>
           </span>
         )}
         <button
-          className="btn btn-sm primary"
+          className={'tb-btn save' + (saving ? ' saving' : '')}
           onClick={() => void save()}
           disabled={!editable || saving || !dirty}
-          title="Save (Ctrl/Cmd+S)"
-        >{saving ? 'Saving…' : 'Save'}</button>
+          title={saving ? 'Saving…' : 'Save (Ctrl/Cmd+S)'}
+          aria-label="Save"
+        >{saving ? <IconRefresh /> : <IconSave />}</button>
         <button
-          className="btn btn-sm"
+          className="tb-btn"
           onClick={() => setConfirmRevert(true)}
           disabled={untracked || !file}
           title={untracked ? 'Untracked file—nothing in git to revert to' : 'Revert file to HEAD'}
-        >Revert</button>
-        <button className="btn btn-sm" onClick={onClose} title="Close editor">Close</button>
+          aria-label="Revert file to HEAD"
+        ><IconRevert /></button>
+        <button className="tb-btn" onClick={onClose} title="Close editor" aria-label="Close editor"><IconClose /></button>
       </div>
       {conflict && (
         <div className="conflict-bar">
