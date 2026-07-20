@@ -1,0 +1,9 @@
+{
+  "name": "word-warehouse-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Host-side dev tooling for the workbench (Playwright for driving/screenshotting the app on :8686). Not part of the app bundle or the Docker image.",
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}
