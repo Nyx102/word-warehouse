@@ -15,14 +15,14 @@ import time
 from backend.config import CORPUS, DATA
 from backend.db import connect
 
-CLAUDE_BIN = (os.environ.get("WORKBENCH_CLAUDE_BIN")
+CLAUDE_BIN = (os.environ.get("WORLDEND_CLAUDE_BIN")
               or shutil.which("claude")
               or os.path.expanduser("~/.local/bin/claude"))
 TURN_TIMEOUT = 600
 MAX_GLOBAL_TURNS = 2
 
 SYSTEM_BLURB = (
-    "You are the WorldEnd translation workbench assistant, reached through a web"
+    "You are the WorldEnd translation assistant, reached through a web"
     " UI (not a terminal). Follow CLAUDE.md. Prefer the `corpus` CLI over"
     " grep/find for searching. Keep answers compact; cite corpus paths with line"
     " numbers so the user can jump to them."
@@ -210,7 +210,7 @@ def _preview(value, limit=400):
 
 
 def _pump(turn, conn):
-    """Translate claude stream-json events into workbench chat events."""
+    """Translate claude stream-json events into chat events."""
     text_acc = []
     for line in turn.proc.stdout:
         line = line.strip()

@@ -1,6 +1,6 @@
 # Word Warehouse — dev guide
 
-Self-hosted workbench for the WorldEnd2 (SukaMoka) fan translation. This file
+Self-hosted workspace for the WorldEnd2 (SukaMoka) fan translation. This file
 is for sessions working on the CODEBASE; the embedded translation assistant
 has its own instructions at `corpus/CLAUDE.md` (auto-loaded there — its cwd is
 the corpus).
@@ -25,7 +25,7 @@ path); the host location is irrelevant and may change.
 ## Run / dev
 
 - `docker compose up -d --build` — the whole thing (binds :8686; container name `word-warehouse`).
-- Frontend rebuild: `docker compose exec workbench sh -c 'cd frontend && npm run build'`; HMR: `npm run dev` in-container on :5173.
+- Frontend rebuild: `docker compose exec word-warehouse sh -c 'cd frontend && npm run build'`; HMR: `npm run dev` in-container on :5173.
 - `corpus` CLI = `backend/cli.py` (wrapper at /usr/local/bin/corpus runs `python3 -m backend.cli`).
 - Tests are live-data verifications — see the verification sections in README.md; the index rebuilds itself, never hand-edit `data/corpus.db`.
 

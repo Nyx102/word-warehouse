@@ -54,7 +54,7 @@ export interface WorkspaceApi extends WsState {
   setGitRepo: (r: RepoName) => void;
 }
 
-const STORAGE_KEY = 'ww.workspace.v1';
+const STORAGE_KEY = 'worldend.workspace.v1';
 const MAX_BUFFERS = 12;
 const RAILS: RailSection[] = ['files', 'search', 'git', 'flags', 'chat'];
 const DOCKS: ChatDockState[] = ['hidden', 'docked', 'full'];

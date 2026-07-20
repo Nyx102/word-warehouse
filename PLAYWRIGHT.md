@@ -1,6 +1,6 @@
 # Playwright (host-side dev tooling)
 
-Playwright drives / screenshots the running workbench (the app on `:8686`) from the
+Playwright drives / screenshots the running app (on `:8686`) from the
 **host**. It is a root-level `devDependency` — deliberately separate from the app:
 
 - Lives in the repo-root `package.json` (`word-warehouse-tools`), **not** in `frontend/`

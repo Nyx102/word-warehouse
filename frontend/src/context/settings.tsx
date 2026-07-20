@@ -13,7 +13,7 @@ interface SettingsApi extends Settings {
   setKeymap: (k: KeymapName) => void;
 }
 
-const STORAGE_KEY = 'ww.settings.v1';
+const STORAGE_KEY = 'worldend.settings.v1';
 
 function readStored(): Settings {
   let raw: Record<string, unknown> = {};

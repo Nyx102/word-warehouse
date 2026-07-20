@@ -1,5 +1,5 @@
 services:
-  workbench:
+  word-warehouse:
     build:
       context: .
       args:
@@ -20,4 +20,4 @@ services:
       - ~/.gitconfig:/home/dev/.gitconfig:ro
     mem_limit: 3g
     environment:
-      - WORKBENCH_CLAUDE_BIN=claude
+      - WORLDEND_CLAUDE_BIN=claude

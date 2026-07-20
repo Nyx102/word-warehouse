@@ -1,7 +1,7 @@
 {
   "name": "Word Warehouse",
   "short_name": "Warehouse",
-  "description": "WorldEnd2 fan-translation workbench",
+  "description": "WorldEnd2 fan-translation workspace",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

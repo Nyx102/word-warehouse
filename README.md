@@ -1,6 +1,6 @@
 # Word Warehouse
 
-Self-hosted workbench for the WorldEnd2 (SukaMoka) fan translation: indexed
+Self-hosted workspace for the WorldEnd2 (SukaMoka) fan translation: indexed
 search over every source (official EN, fan EN, JP raws, ZH raws in both
 scripts), a consistency checker with AI triage, cross-language chapter
 alignment, git-visible editing with an in-browser merge editor, and a chat
@@ -103,7 +103,7 @@ phone.
 | `backend/lint/checker.py` | lint: near-miss typos (edit-distance vs replacements.yaml vocab, official-EN whitelist) + leftover-term regression with exact rule simulation |
 | `backend/adapters/chat.py` | claude CLI headless (stream-json, `--resume` per thread); permissions via flags (allow: read/search/edit + corpus CLI + read-only git; deny: commit/push/rm/sudo); **default model sonnet**, per-thread picker in the UI; credits are spent only here and in triage |
 | `backend/lint/triage.py` | AI flag adjudication: haiku judges lint flags from context (±2→±10→±30 line escalation, max 2), conservative, per-file verdict cache — unchanged text is never re-judged |
-| `frontend/` | React + Vite + TS + CodeMirror IDE workspace (icon rail + sidebar + buffer tabs + chat dock; doom-one dark/light; vim/emacs/normal keymaps; mobile bottom nav, installable PWA). Rebuild after changes: `docker compose exec workbench sh -c 'cd frontend && npm run build'`; HMR dev server: `npm run dev` in-container on :5173 |
+| `frontend/` | React + Vite + TS + CodeMirror IDE workspace (icon rail + sidebar + buffer tabs + chat dock; doom-one dark/light; vim/emacs/normal keymaps; mobile bottom nav, installable PWA). Rebuild after changes: `docker compose exec word-warehouse sh -c 'cd frontend && npm run build'`; HMR dev server: `npm run dev` in-container on :5173 |
 | `backend/cli.py` | the `corpus` command (symlinked into `~/.local/bin` and the container): search / context / align / terms / lint / sniff / status / reindex |
 | `scripts/reorg.py` | one-shot corpus reorganization (already executed 2026-07-17) |
 | `scripts/coverage.py` | regenerates `corpus/notes/coverage.md` |

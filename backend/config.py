@@ -8,21 +8,21 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = Path(os.environ.get("WORKBENCH_CORPUS", str(ROOT / "corpus")))
-DATA = Path(os.environ.get("WORKBENCH_DATA", str(ROOT / "data")))
+CORPUS = Path(os.environ.get("WORLDEND_CORPUS", str(ROOT / "corpus")))
+DATA = Path(os.environ.get("WORLDEND_DATA", str(ROOT / "data")))
 DB_PATH = DATA / "corpus.db"
 
 # Files-tab browse/edit root. Defaults to the project (host-independent per the
-# no-host-paths rule); widen by setting WORKBENCH_FS_ROOT + a matching bind mount.
-FS_ROOT = Path(os.environ.get("WORKBENCH_FS_ROOT", str(ROOT))).resolve()
+# no-host-paths rule); widen by setting WORLDEND_FS_ROOT + a matching bind mount.
+FS_ROOT = Path(os.environ.get("WORLDEND_FS_ROOT", str(ROOT))).resolve()
 
 REPO = CORPUS / "worldend2/repo"
 RULES_YAML = REPO / "Volumes/replacements.yaml"
 SCRIPTS_DIR = REPO / "Scripts"
 
 # Bare-host default is loopback; the container CMD passes --host 0.0.0.0
-HOST = os.environ.get("WORKBENCH_HOST", "127.0.0.1")
-PORT = int(os.environ.get("WORKBENCH_PORT", "8686"))
+HOST = os.environ.get("WORLDEND_HOST", "127.0.0.1")
+PORT = int(os.environ.get("WORLDEND_PORT", "8686"))
 
 # Glob patterns (relative to CORPUS) that make up the index, and nothing else
 INCLUDE_GLOBS = [

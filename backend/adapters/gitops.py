@@ -1,4 +1,4 @@
-"""Git wrappers for the two repos the workbench exposes.
+"""Git wrappers for the two repos this server exposes.
 
 Error contract: ValueError for rejected input (bad rev, unsafe path, bad
 branch name, empty message), RuntimeError for a failed git command. Handlers

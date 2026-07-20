@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""WorldEnd translation workbench — FastAPI + uvicorn web server.
+"""WorldEnd translation server — FastAPI + uvicorn.
 
 Sync path operations run in uvicorn's threadpool, so every request gets its own
 thread-local sqlite connection and blocking git / subprocess / sqlite work never
