@@ -294,6 +294,23 @@ def lint_undismiss(body: dict = Depends(json_body)):
     return dict(ok=True)
 
 
+@app.post("/api/lint/fix")
+def lint_fix(body: dict = Depends(json_body)):
+    """Rewrite the text one flag covers, in the one file it was raised in."""
+    from backend.lint import fixer  # Lazy: mirrors the triage routes
+    rel = body.get("path", "")
+    if safe_corpus_path(rel) is None:
+        raise HTTPException(400, "bad path")
+    try:
+        res = fixer.apply(rel, body["category"], body["key"])
+    except KeyError:
+        raise HTTPException(400, "missing category or key")
+    except fixer.Unfixable as e:
+        raise HTTPException(409, str(e))
+    _refresh_lint(force=True)
+    return res
+
+
 @app.get("/api/threads")
 def threads():
     return dict(threads=chat.list_threads())

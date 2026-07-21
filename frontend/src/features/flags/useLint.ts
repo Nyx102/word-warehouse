@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toast } from '@/components/Toasts';
 import { flagIdent } from './FlagCard';
 import type { ClearedFlag } from './AiDismissedSection';
 import type { LintFlag, LintReport, LintScope } from '@/lib/types';
@@ -18,6 +19,7 @@ export interface LintApi {
   isDismissed: (f: LintFlag) => boolean;
   toggleDismiss: (f: LintFlag) => Promise<void>;
   restore: (f: LintFlag) => Promise<void>;
+  fix: (path: string, f: LintFlag) => Promise<void>;
 }
 
 /** Lint report state for the Flags sidebar: fetch (react-query, keyed on
@@ -133,6 +135,31 @@ export function useLint(scope: LintScope, showDismissed: boolean, active: boolea
     await restoreMut.mutateAsync(flag).catch(() => { /* toast shown */ });
   }, [restoreMut]);
 
+  // Rewrites the file on disk, so no optimistic flip: the flag only goes away
+  // once the server has re-linted.
+  const fixMut = useMutation({
+    mutationFn: (v: { path: string; flag: LintFlag }) =>
+      api<{ count: number; change: string }>('/api/lint/fix', {
+        method: 'POST',
+        body: { path: v.path, category: v.flag.category, key: v.flag.key },
+      }),
+    onMutate: (v) => {
+      const key = flagIdent(v.flag);
+      setBusyKeys((s) => new Set(s).add(key));
+      return { key };
+    },
+    onSettled: (_d, _e, _v, ctx) => {
+      if (ctx) setBusyKeys((s) => { const n = new Set(s); n.delete(ctx.key); return n; });
+    },
+    onSuccess: (r) => {
+      toast(`Fixed ${r.change} ×${r.count}`, 'ok');
+      invalidateLint();
+    },
+  });
+  const fix = useCallback(async (path: string, flag: LintFlag) => {
+    await fixMut.mutateAsync({ path, flag }).catch(() => { /* toast shown */ });
+  }, [fixMut]);
+
   // Split each file's flags: AI-cleared ones sink to the bottom section
   const cleared: ClearedFlag[] = [];
   const seenCleared = new Set<string>();
@@ -167,5 +194,6 @@ export function useLint(scope: LintScope, showDismissed: boolean, active: boolea
     isDismissed,
     toggleDismiss,
     restore,
+    fix,
   };
 }

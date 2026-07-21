@@ -87,6 +87,8 @@ export function FlagsSidebar() {
                 flag={fl}
                 dismissed={lint.isDismissed(fl)}
                 onToggleDismiss={() => void lint.toggleDismiss(fl)}
+                onFix={() => void lint.fix(f.path, fl)}
+                fixBusy={lint.busyKeys.has(flagIdent(fl))}
                 onOpen={openFile}
               />
             ))}

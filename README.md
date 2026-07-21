@@ -107,6 +107,7 @@ phone.
 | `backend/index/indexer.py` | segmentation per source format; JP ruby-strip + trad→simp shadow columns; SQLite FTS5 (unicode61 for EN, trigram for CJK) |
 | `backend/index/search.py` | query routing EN/JP/ZH, LIKE fallback for short CJK, chapter alignment via `-subtitle-` join keys |
 | `backend/lint/checker.py` | lint: near-miss typos (edit-distance vs replacements.yaml vocab, official-EN whitelist) + leftover-term regression with exact rule simulation |
+| `backend/lint/fixer.py` | one-click flag fixes: regression replays the flag's own rule through the fan repo's `make_replacement_function` (exact, `manual` rules included—the script rewrites those too and only additionally logs them); nearmiss corrects the typo and then carries the word through the rules via `checker.canonicalize`, since the near-missed word is usually itself a fan term (a suggestion, not an authority) |
 | `backend/adapters/chat.py` | claude CLI headless (stream-json, `--resume` per thread); permissions via flags (allow: read/search/edit + corpus CLI + read-only git; deny: commit/push/rm/sudo); **default model sonnet**, per-thread picker in the UI; credits are spent only here and in triage |
 | `backend/lint/triage.py` | AI flag adjudication: haiku judges lint flags from context (±2→±10→±30 line escalation, max 2), conservative, per-file verdict cache — unchanged text is never re-judged |
 | `frontend/` | React + Vite + TS + CodeMirror IDE workspace (icon rail + sidebar + buffer tabs + chat dock; doom-one dark/light; vim/emacs/normal keymaps; mobile bottom nav, installable PWA). Rebuild after changes: `scripts/rebuild-frontend.sh`; HMR dev server: `npm run dev` in-container on :5173 |
@@ -114,6 +115,7 @@ phone.
 | `scripts/reorg.py` | one-shot corpus reorganization (already executed 2026-07-17) |
 | `scripts/coverage.py` | regenerates `corpus/notes/coverage.md` |
 | `scripts/gen_trad2simp.py` | regenerates `backend/index/trad2simp.py` from the parallel v05 editions |
+| `scripts/verify_fixer.py` | live verification that a per-flag regression fix equals a full `regex_replace.py` run (no rule-order divergence; replaying every flag reproduces `apply_rules` byte for byte) |
 | `scripts/verify_gitops.py` | live verification of the git backend against a scratch repo (status parsing, stage/unstage, hunk cycle, commit, log, branches, injection rejections) |
 
 ## Data & state

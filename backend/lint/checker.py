@@ -30,8 +30,20 @@ _cache = {}
 
 
 def _rules():
-    if "rules" not in _cache:
+    """Rules, reloaded whenever replacements.yaml changes on disk.
+
+    Everything else cached here (vocab, buckets, token verdicts) is derived
+    from the rules, so an edit invalidates the whole cache — otherwise a
+    long-lived server keeps flagging against the rules it booted with."""
+    try:
+        stamp = RULES_YAML.stat().st_mtime_ns
+    except OSError:
+        stamp = None
+    if "rules" not in _cache or _cache.get("stamp") != stamp:
+        _cache.clear()
+        _token_verdicts.clear()
         _cache["rules"] = regex_replace.load_rules(RULES_YAML)
+        _cache["stamp"] = stamp
     return _cache["rules"]
 
 
@@ -173,9 +185,9 @@ def _match_token(base):
       words sit distance-2 from each other constantly; transpositions still count)
     - Capitalized tokens: distance 1 (len<=6) or 2 (len>=7)
     """
+    vocab, vocab_cf = _vocab()  # Before the memo lookup: a rules edit empties it
     if base in _token_verdicts:
         return _token_verdicts[base]
-    vocab, vocab_cf = _vocab()
     whitelist = _whitelist()
     cf = base.casefold()
     verdict = None
@@ -191,6 +203,50 @@ def _match_token(base):
                 break
     _token_verdicts[base] = verdict
     return verdict
+
+
+def canonicalize(term, text, start, end):
+    """Run the replacement rules over `term` standing at [start, end) in `text`.
+
+    A near-missed token usually resolves to a FAN term, because _vocab draws
+    from both sides of every rule. Correcting the spelling alone would leave
+    that fan term in place, so the rules carry it the rest of the way to the
+    official form the script would have produced had the word been spelled
+    right. Judged in place, not standalone: sentence_aware needs the real
+    preceding text to decide capitalization."""
+    cur = term
+    for rule in _rules():
+        try:
+            pattern = rule.pattern()
+        except re.error:
+            continue
+        ctx = text[:start] + cur + text[end:]
+        span_end = start + len(cur)
+        repl = regex_replace.make_replacement_function(rule, ctx)
+        out, pos = [], start
+        for m in pattern.finditer(ctx, start):
+            if m.start() >= span_end or m.end() > span_end:
+                break  # Past the term, or spilling into its surroundings
+            try:
+                new = repl(m)
+            except re.error:
+                continue
+            if new != m.group(0):
+                out.append(ctx[pos:m.start()])
+                out.append(new)
+                pos = m.end()
+        if out:
+            out.append(ctx[pos:span_end])
+            cur = "".join(out)
+    return cur
+
+
+NEUTRAL_CTX = "x "  # Mid-sentence, so sentence_aware yields the lowercase base form
+
+
+def canonical_term(term):
+    """Display form of `term` after the rules, judged mid-sentence."""
+    return canonicalize(term, NEUTRAL_CTX, len(NEUTRAL_CTX), len(NEUTRAL_CTX))
 
 
 def _centered_snippet(line, start, end, radius=60):
@@ -218,7 +274,8 @@ def check_nearmiss(text, rel):
                           snippet=_centered_snippet(line, s, e))
                      for ln, line, s, e in occ[:5]]
         out.append(dict(category="nearmiss", key=base, closest=closest,
-                        count=len(occ), locations=locations))
+                        suggest=canonical_term(closest), count=len(occ),
+                        locations=locations))
     return out
 
 
@@ -230,17 +287,20 @@ def check_regression(text, rel):
         except re.error:
             continue
         repl = regex_replace.make_replacement_function(rule, text)
-        by_match = defaultdict(lambda: dict(count=0, locations=[]))
+        by_match = defaultdict(lambda: dict(count=0, locations=[], becomes=None))
         for m in pattern.finditer(text):
             try:
-                if repl(m) == m.group(0):
-                    continue  # Rule is a no-op here (e.g. correct sentence case)
+                new = repl(m)
             except re.error:
                 continue
+            if new == m.group(0):
+                continue  # Rule is a no-op here (e.g. correct sentence case)
             key = m.group(0)[:40]
             ln = text.count("\n", 0, m.start()) + 1
             h = by_match[key]
             h["count"] += 1
+            if h["becomes"] is None:
+                h["becomes"] = new  # What the fix actually writes, backrefs and case applied
             if len(h["locations"]) < 5:
                 ls = text.rfind("\n", 0, m.start()) + 1
                 le = text.find("\n", m.start())
@@ -253,7 +313,8 @@ def check_regression(text, rel):
             flags.append(dict(category="regression", key=f"{idx}:{key}",
                               rule=idx, find=rule.find, replace=rule.replace,
                               manual=rule.manual, notes=rule.notes, matched=key,
-                              count=h["count"], locations=h["locations"]))
+                              becomes=h["becomes"], count=h["count"],
+                              locations=h["locations"]))
     return flags
 
 

@@ -230,6 +230,13 @@ export const IconRevert = () => (
   </Svg>
 );
 
+export const IconArrowRight = () => (
+  <Svg>
+    <path d="M4 12h15" />
+    <path d="M13 6l6 6-6 6" />
+  </Svg>
+);
+
 export const IconPlus = () => (
   <Svg>
     <path d="M12 5v14M5 12h14" />

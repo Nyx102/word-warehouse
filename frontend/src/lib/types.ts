@@ -197,11 +197,17 @@ export interface LintFlag {
   category: 'nearmiss' | 'regression';
   key: string;
   closest?: string | null;
+  /** nearmiss: `closest` carried through the replacement rules. Differs from
+   * `closest` whenever the near-missed word is itself a fan term. */
+  suggest?: string | null;
   rule?: number | string | null;
   find?: string | null;
   replace?: string | null;
   manual?: boolean;
   matched?: string | null;
+  /** regression: the text the fix actually writes, backrefs and case_mode
+   * already applied. Not derivable from `replace`, which may be a template. */
+  becomes?: string | null;
   count?: number;
   dismissed?: boolean;
   ai?: LintAi | null;
