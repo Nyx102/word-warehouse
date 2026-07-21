@@ -1,5 +1,4 @@
-import { flagIdent } from './FlagCard';
-import { IconRevert } from '@/components/layout/icons';
+import { FlagCard, flagIdent } from './FlagCard';
 import type { LintFlag } from '@/lib/types';
 
 export interface ClearedFlag {
@@ -7,11 +6,10 @@ export interface ClearedFlag {
   flag: LintFlag;
 }
 
-/** Collapsible bottom section listing flags the AI triage judged 'clear'.
- * Restore (user disagrees) -> POST /api/triage/reject, then refetch. */
-export function AiDismissedSection({ cleared, onRestore, busyKeys }: {
+export function AiDismissedSection({ cleared, onRestore, onOpen, busyKeys }: {
   cleared: ClearedFlag[];
   onRestore: (f: LintFlag) => void;
+  onOpen: (path: string, line?: number | null) => void;
   busyKeys: Set<string>;
 }) {
   if (!cleared.length) return null;
@@ -19,26 +17,13 @@ export function AiDismissedSection({ cleared, onRestore, busyKeys }: {
     <details className="ai-dismissed">
       <summary>AI dismissed ({cleared.length})</summary>
       <div className="ai-dismissed-list">
-        {cleared.map(({ filePath, flag }) => (
-          <div className="flag ai-cleared" key={flagIdent(flag)}>
-            <div className="flag-head">
-              <span className="chip chip-clear">{flag.category}</span>
-              <button
-                className="tb-btn flag-btn"
-                disabled={busyKeys.has(flagIdent(flag))}
-                title="Disagree with the AI verdict and restore this flag"
-                aria-label="Restore this flag"
-                onClick={() => onRestore(flag)}
-              ><IconRevert /></button>
-            </div>
-            <span className="flag-title">
-              <b>{flag.key}</b> <span className="dim mono">{filePath}</span>
-            </span>
-            <div className="ai-note">
-              AI: clear—{flag.ai?.reason || '(no reason given)'}
-              {flag.ai?.judged_at ? <span className="dim"> · judged {flag.ai.judged_at}</span> : null}
-            </div>
-          </div>
+        {cleared.map(({ flag }) => (
+          <FlagCard
+            key={flagIdent(flag)}
+            flag={flag}
+            onOpen={onOpen}
+            cleared={{ onRestore: () => onRestore(flag), busy: busyKeys.has(flagIdent(flag)) }}
+          />
         ))}
       </div>
     </details>

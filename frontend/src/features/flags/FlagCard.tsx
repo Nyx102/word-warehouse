@@ -32,17 +32,22 @@ export function markLocation(snippet: string | null | undefined, token: string |
   return esc(s);
 }
 
-export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen }: {
+export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen, cleared }: {
   flag: LintFlag;
-  dismissed: boolean;
-  onToggleDismiss: () => void;
+  dismissed?: boolean;
+  onToggleDismiss?: () => void;
   // Open the flagged file at a line in the Files editor. Flag paths are
   // CORPUS-relative; the Files editor is project-relative, so prefix 'corpus/'.
   onOpen: (path: string, line?: number | null) => void;
+  // AI-cleared mode: same body (title, note, locations) but a green chip and a
+  // "disagree with the AI" restore button in place of the dismiss toggle.
+  cleared?: { onRestore: () => void; busy: boolean };
 }) {
-  const chipClass = 'chip '
-    + (flag.category === 'nearmiss' ? 'chip-nearmiss' : 'chip-regression')
-    + (flag.manual ? ' chip-striped' : '');
+  const chipClass = cleared
+    ? 'chip chip-clear'
+    : 'chip '
+      + (flag.category === 'nearmiss' ? 'chip-nearmiss' : 'chip-regression')
+      + (flag.manual ? ' chip-striped' : '');
 
   let title: ReactNode;
   if (flag.category === 'nearmiss') {
@@ -65,19 +70,35 @@ export function FlagCard({ flag, dismissed, onToggleDismiss, onOpen }: {
   const token = flag.matched || flag.key || flag.find;
 
   return (
-    <div className={'flag' + (dismissed ? ' dismissed' : '')}>
+    <div className={'flag' + (cleared ? ' ai-cleared' : '') + (dismissed ? ' dismissed' : '')}>
       <div className="flag-head">
         <span className={chipClass}>{flag.manual ? 'manual ' + flag.category : flag.category}</span>
-        <button
-          className="tb-btn flag-btn"
-          onClick={onToggleDismiss}
-          title={dismissed ? 'Undismiss' : 'Dismiss'}
-          aria-label={dismissed ? 'Undismiss' : 'Dismiss'}
-        >{dismissed ? <IconRevert /> : <IconClose />}</button>
+        {cleared ? (
+          <button
+            className="tb-btn flag-btn"
+            disabled={cleared.busy}
+            title="Disagree with the AI verdict and restore this flag"
+            aria-label="Restore this flag"
+            onClick={cleared.onRestore}
+          ><IconRevert /></button>
+        ) : (
+          <button
+            className="tb-btn flag-btn"
+            onClick={onToggleDismiss}
+            title={dismissed ? 'Undismiss' : 'Dismiss'}
+            aria-label={dismissed ? 'Undismiss' : 'Dismiss'}
+          >{dismissed ? <IconRevert /> : <IconClose />}</button>
+        )}
       </div>
       {title}
       {flag.ai?.verdict === 'keep' && (
         <div className="ai-note">AI: keep—{flag.ai.reason}</div>
+      )}
+      {cleared && (
+        <div className="ai-note">
+          AI: clear—{flag.ai?.reason || '(no reason given)'}
+          {flag.ai?.judged_at ? <span className="dim"> · judged {flag.ai.judged_at}</span> : null}
+        </div>
       )}
       {(flag.locations || []).length > 0 && (
         <details className="flag-locs" open={flag.locations.length <= 3}>

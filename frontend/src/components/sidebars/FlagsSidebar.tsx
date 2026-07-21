@@ -95,6 +95,7 @@ export function FlagsSidebar() {
         <AiDismissedSection
           cleared={lint.cleared}
           onRestore={(f) => void lint.restore(f)}
+          onOpen={openFile}
           busyKeys={lint.busyKeys}
         />
       </div>
