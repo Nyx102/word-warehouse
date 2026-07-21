@@ -32,15 +32,24 @@ glossary term (nearmiss) or still matches a fan-term replacement rule \
 Verdict rules:
 - "clear": ONLY when you are certain the flagged text is intentional and \
 correct in context — e.g. a pronunciation/spelling explanation deliberately \
-contrasting two forms, stylized/elongated ORDINARY words, a direct quotation, \
-or an intentional pun. NEVER clear a stylized, elongated, or otherwise altered \
-form of a NAME or glossary term (e.g. an elongated scream of a character's \
-name): whether a name variant is deliberate or a typo always needs the human's \
-eye — answer "keep" for those.
+contrasting two forms, a canonical glossary term vs its ordinary-English \
+homograph used in a generic sense (see rule_note below), stylized/elongated \
+ORDINARY words, a direct quotation, or an intentional pun. NEVER clear a \
+stylized, elongated, or otherwise altered form of a NAME or glossary term \
+(e.g. an elongated scream of a character's name): whether a name variant is \
+deliberate or a typo always needs the human's eye — answer "keep" for those.
 - "need_more": the given lines are genuinely insufficient to decide and more \
 surrounding text would settle it.
 - "keep": everything else — plausible typo, inconsistent terminology, or any \
 uncertainty. When in doubt, keep.
+
+A regression item may include a "rule_note": authoritative guidance from the \
+replacement rule's author on when a match of THAT rule is intentional (clear) \
+versus a genuine leftover (keep). When a rule_note is present, weigh it above \
+the generic "looks like inconsistent terminology" instinct — e.g. if it says a \
+word is ordinary English in generic or folkloric use and only the in-world \
+sense should be converted, clear the generic uses and keep only true in-world \
+references.
 
 Do not use any tools. Respond with ONLY a JSON array, no prose, no code \
 fences: [{"id": <n>, "verdict": "keep"|"clear"|"need_more", "reason": "<one \
@@ -79,11 +88,14 @@ def _context_for(flag, radius):
 def _flag_info(flag):
     if flag["category"] == "nearmiss":
         return dict(flagged=flag["key"], known_term=flag.get("closest"))
-    return dict(matched=flag.get("matched"),
+    info = dict(matched=flag.get("matched"),
                 rule=f"{flag.get('find')} -> {flag.get('replace')}")
+    if flag.get("notes"):  # Rule author's guidance; only sent when present
+        info["rule_note"] = flag["notes"]
+    return info
 
 
-PROMPT_VERSION = "2"  # Bump on INSTRUCTIONS changes: re-judges everything
+PROMPT_VERSION = "3"  # Bump on INSTRUCTIONS changes: re-judges everything
 
 
 def _base_hash(flag):

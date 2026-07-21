@@ -252,8 +252,8 @@ def check_regression(text, rel):
         for key, h in by_match.items():
             flags.append(dict(category="regression", key=f"{idx}:{key}",
                               rule=idx, find=rule.find, replace=rule.replace,
-                              manual=rule.manual, matched=key, count=h["count"],
-                              locations=h["locations"]))
+                              manual=rule.manual, notes=rule.notes, matched=key,
+                              count=h["count"], locations=h["locations"]))
     return flags
 
 
