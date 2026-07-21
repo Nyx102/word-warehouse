@@ -60,6 +60,7 @@ function wireModalSave() {
 
 const keymapCompartment = new Compartment();
 const themeCompartment = new Compartment();
+const wrapCompartment = new Compartment();
 
 /* Flash-line: an overlay rectangle painted the same way CodeMirror's own
  * selection layer is (RectangleMarker, same as drawSelection()) — visually
@@ -177,14 +178,21 @@ export function baseExtensions({ onSave, wrap, keymap: mode }: {
       ...searchKeymap,
       indentWithTab,
     ]),
+    wrapCompartment.of(wrap ? EditorView.lineWrapping : []),
   ];
-  if (wrap) ext.push(EditorView.lineWrapping);
   return ext;
 }
 
 /** Switch a live editor's keymap mode without rebuilding it. */
 export function applyKeymap(view: EditorView, mode: KeymapName): void {
   view.dispatch({ effects: keymapCompartment.reconfigure(modalExt(mode)) });
+}
+
+/** Toggle line wrapping on a live editor without rebuilding it. Reconfigures a
+ * compartment (like applyKeymap) so the scroll offset and cursor survive — a
+ * full rebuild would snap the view back to the top of the file. */
+export function applyWrap(view: EditorView, wrap: boolean): void {
+  view.dispatch({ effects: wrapCompartment.reconfigure(wrap ? EditorView.lineWrapping : []) });
 }
 
 /** Read-only but fully navigable editor extensions: a real cursor and the
@@ -210,8 +218,8 @@ export function readOnlyExtensions({ wrap, keymap: mode }: {
     flashLineExt(),
     highlightSelectionMatches(),
     keymap.of([...defaultKeymap, ...searchKeymap]),
+    wrapCompartment.of(wrap ? EditorView.lineWrapping : []),
   ];
-  if (wrap) ext.push(EditorView.lineWrapping);
   return ext;
 }
 

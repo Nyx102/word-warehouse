@@ -19,6 +19,10 @@ export interface BufferEntry {
   desc: BufferDesc;
   title: string;
   dirty: boolean;
+  /** Transient (never persisted) counter bumped every time open() targets this
+   * buffer with a line. Deep-link editors key their jump-to-line effect on it,
+   * so re-clicking the same location re-jumps even when the line is unchanged. */
+  gotoNonce: number;
 }
 
 interface WsState {
@@ -108,7 +112,7 @@ function restoreState(): WsState {
         const id = bufferId(desc);
         if (seen.has(id)) continue;
         seen.add(id);
-        out.buffers.push({ id, desc, title: bufferTitle(desc), dirty: false });
+        out.buffers.push({ id, desc, title: bufferTitle(desc), dirty: false, gotoNonce: 0 });
       }
     }
     out.activeId = typeof raw.activeId === 'string' && seen.has(raw.activeId)
@@ -185,14 +189,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const existing = s.buffers.find((b) => b.id === id);
       if (existing) {
         // Re-opening a file/diff with a target line updates the desc so deep
-        // links re-jump; identity and dirty state are untouched
+        // links re-jump; identity and dirty state are untouched. Bumping
+        // gotoNonce is what forces the jump even when the line is unchanged
+        // (a repeat click on the same location).
         const update = (desc.kind === 'file' || desc.kind === 'diff') && desc.line != null;
         const buffers = update
-          ? s.buffers.map((b) => (b.id === id ? { ...b, desc, title: bufferTitle(desc) } : b))
+          ? s.buffers.map((b) => (b.id === id
+            ? { ...b, desc, title: bufferTitle(desc), gotoNonce: b.gotoNonce + 1 }
+            : b))
           : s.buffers;
         return { ...s, buffers, activeId: id, chatDock };
       }
-      let buffers = [...s.buffers, { id, desc, title: bufferTitle(desc), dirty: false }];
+      let buffers = [...s.buffers, { id, desc, title: bufferTitle(desc), dirty: false, gotoNonce: 0 }];
       if (buffers.length > MAX_BUFFERS) {
         // Soft cap: evict clean buffers only, least recently active first
         const order = lruRef.current;

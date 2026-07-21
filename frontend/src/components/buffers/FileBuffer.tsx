@@ -16,10 +16,11 @@ const isBinaryPath = (p: string) =>
 
 /** File buffer: the shared sha256-tracked editor, or a download stub for
  * binary files. Oversized text files hit FileEditor's own 413 fallback. */
-export function FileBuffer({ bufferId, path, line }: {
+export function FileBuffer({ bufferId, path, line, gotoNonce }: {
   bufferId: string;
   path: string;
   line?: number | null;
+  gotoNonce?: number;
 }) {
   const ws = useWorkspace();
   const dlHref = `/api/fs/download?path=${encodeURIComponent(path)}`;
@@ -59,6 +60,7 @@ export function FileBuffer({ bufferId, path, line }: {
     <FileEditor
       path={path}
       gotoLine={line ?? null}
+      gotoNonce={gotoNonce}
       active={active}
       onClose={() => ws.close(bufferId)}
       onDirtyChange={setDirty}

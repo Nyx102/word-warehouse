@@ -35,11 +35,12 @@ interface Loaded {
  * `path` is repo-relative; both the git endpoints and /api/file take (repo,
  * path) and resolve it under that repo's root, so any file in the repo's git
  * status is loadable/editable (including code at the project root). */
-export function MergeEditor({ repo, path, status, gotoLine, active, onChanged, onClose }: {
+export function MergeEditor({ repo, path, status, gotoLine, gotoNonce, active, onChanged, onClose }: {
   repo: RepoName;
   path: string;
   status: string;
   gotoLine?: number | null;
+  gotoNonce?: number; // bumps on every open() so re-visiting the same line re-jumps
   active?: boolean; // is this the visible buffer? drives modeline vim-mode + autofocus
   onChanged: () => void;
   onClose: () => void;
@@ -287,7 +288,7 @@ export function MergeEditor({ repo, path, status, gotoLine, active, onChanged, o
     const target = v.views[v.views.length - 1];
     if (gotoLine > target.state.doc.lines) return;
     flashLine(target, target.state.doc.line(gotoLine).from);
-  }, [gotoLine, file, isDesktop]);
+  }, [gotoLine, gotoNonce, file, isDesktop]);
 
   const doRevert = useCallback(async () => {
     setConfirmRevert(false);

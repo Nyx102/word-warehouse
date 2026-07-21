@@ -18,9 +18,9 @@ export function BufferArea() {
     const d = b.desc;
     switch (d.kind) {
       case 'file':
-        return <FileBuffer bufferId={b.id} path={d.path} line={d.line} />;
+        return <FileBuffer bufferId={b.id} path={d.path} line={d.line} gotoNonce={b.gotoNonce} />;
       case 'diff':
-        return <DiffBuffer repo={d.repo} path={d.path} line={d.line} />;
+        return <DiffBuffer repo={d.repo} path={d.path} line={d.line} gotoNonce={b.gotoNonce} />;
       case 'magit':
         return <MagitBuffer repo={d.repo} />;
       case 'log':

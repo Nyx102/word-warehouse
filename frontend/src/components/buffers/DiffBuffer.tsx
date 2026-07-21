@@ -10,7 +10,7 @@ import { useGitMutations } from '@/features/git/useGitMutations';
 import { queryClient } from '@/lib/queryClient';
 import type { RepoName } from '@/lib/types';
 
-export function DiffBuffer({ repo, path, line }: { repo: RepoName; path: string; line?: number | null }) {
+export function DiffBuffer({ repo, path, line, gotoNonce }: { repo: RepoName; path: string; line?: number | null; gotoNonce?: number }) {
   const ws = useWorkspace();
   const id = useMemo(() => bufferId({ kind: 'diff', repo, path }), [repo, path]);
   const active = ws.activeId === id;
@@ -69,6 +69,7 @@ export function DiffBuffer({ repo, path, line }: { repo: RepoName; path: string;
         path={path}
         status={entry?.status ?? ''}
         gotoLine={line ?? null}
+        gotoNonce={gotoNonce}
         active={active}
         onChanged={() => void queryClient.invalidateQueries({ queryKey: gitKeys.all(repo) })}
         onClose={() => ws.close(id)}

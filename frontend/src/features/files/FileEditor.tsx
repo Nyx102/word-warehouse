@@ -5,7 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { toast } from '@/components/Toasts';
 import { useMediaQuery } from '@/lib/util';
 import { useSettings } from '@/context/settings';
-import { applyKeymap, baseExtensions, cursorFromState, flashLine, languageForPath, wireVimModeIndicator } from '@/features/editor/cm';
+import { applyKeymap, applyWrap, baseExtensions, cursorFromState, flashLine, languageForPath, wireVimModeIndicator } from '@/features/editor/cm';
 import { setCursorPos } from '@/features/editor/cursorStore';
 import { setVimMode } from '@/features/editor/vimModeStore';
 import { IconClose, IconDownload, IconHistory, IconRefresh, IconSave, IconWrap } from '@/components/layout/icons';
@@ -28,9 +28,10 @@ function Crumbs({ path }: { path: string }) {
 /** Plain editable file editor for file buffers. Loads/saves via the same
  * (repo=corpus) /api/file contract the Diffs editor uses (sha256 optimistic
  * concurrency), with an optional jump-to-line for flag/search deep-links. */
-export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyChange, onHistory }: {
+export function FileEditor({ path, gotoLine, gotoNonce, active, onSaved, onClose, onDirtyChange, onHistory }: {
   path: string;                  // project-relative (under FS_ROOT / ROOT)
   gotoLine?: number | null;      // 1-based line to scroll to + select on open
+  gotoNonce?: number;            // bumps on every open() so re-clicking the same line re-jumps
   active?: boolean;               // is this the visible buffer? drives the modeline cursor readout
   onSaved?: () => void;
   onClose: () => void;
@@ -50,6 +51,8 @@ export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyCh
   const [conflict, setConflict] = useState(false);
   const [wrapOverride, setWrapOverride] = useState<boolean | null>(null);
   const wrap = wrapOverride ?? isDesktop;
+  const wrapRef = useRef(wrap);
+  wrapRef.current = wrap;
 
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -117,14 +120,15 @@ export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyCh
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  // Build / rebuild the editor when the file loads or wrap mode flips
+  // Build / rebuild the editor when the file (re)loads. Wrap toggles are
+  // handled in place below, not here, so flipping wrap keeps the scroll spot.
   useEffect(() => {
     if (content == null || !hostRef.current) return;
     const parent = hostRef.current;
     parent.replaceChildren();
     const ext = baseExtensions({
       onSave: () => { void saveRef.current(); },
-      wrap,
+      wrap: wrapRef.current,
       keymap: keymapRef.current,
     });
     const lang = languageForPath(path);
@@ -141,7 +145,15 @@ export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyCh
     }
     rewireVimMode(view);
     return () => { view.destroy(); viewRef.current = null; rewireVimMode(null); };
-  }, [content, wrap, path, rewireVimMode]);
+  }, [content, path, rewireVimMode]);
+
+  // Live wrap toggle. Reconfigure a compartment instead of rebuilding the
+  // view, so the scroll offset and cursor stay put (a rebuild would snap the
+  // reader back to the top of the file). Rebuilds read the current mode off
+  // wrapRef, so this only fires for in-place toggles.
+  useEffect(() => {
+    if (viewRef.current) applyWrap(viewRef.current, wrap);
+  }, [wrap]);
 
   // Buffer switched to active (tab click) without a rebuild -> grab focus
   // and resync the modeline
@@ -163,7 +175,7 @@ export function FileEditor({ path, gotoLine, active, onSaved, onClose, onDirtyCh
     const v = viewRef.current;
     if (!v || content == null || !gotoLine || gotoLine < 1 || gotoLine > v.state.doc.lines) return;
     flashLine(v, v.state.doc.line(gotoLine).from);
-  }, [gotoLine, content]);
+  }, [gotoLine, gotoNonce, content]);
 
   return (
     <div className="merge-editor">
